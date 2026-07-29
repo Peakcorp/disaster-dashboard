@@ -142,9 +142,12 @@ async function tagMaterialsForEvent(
   await supabase.from("event_materials").insert(rows);
 }
 
+// SHA-256, not MD5 — Deno's Web Crypto implementation follows the W3C
+// SubtleCrypto spec, which only supports SHA-1/256/384/512 (no MD5). Any
+// deterministic hash works equally well for this change-detection purpose.
 async function hashPayload(payload: unknown): Promise<string> {
   const data = new TextEncoder().encode(JSON.stringify(payload));
-  const digest = await crypto.subtle.digest("MD5", data);
+  const digest = await crypto.subtle.digest("SHA-256", data);
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

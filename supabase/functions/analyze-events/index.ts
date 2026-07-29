@@ -28,13 +28,13 @@
 // Can also be invoked manually: `supabase functions invoke analyze-events`
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import Anthropic from "npm:@anthropic-ai/sdk@0.32";
 import {
   AI_MODEL,
   MAX_EVENTS_PER_CYCLE,
   MAX_RESPONSE_TOKENS,
   DAILY_TOKEN_BUDGET,
   estimateCostUsd,
+  callClaudeJson,
 } from "../_shared/ai.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -98,7 +98,6 @@ const RESPONSE_SCHEMA = {
 
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-  const anthropic = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
 
   // Rule 6: daily token budget check.
   const today = new Date().toISOString().slice(0, 10);
@@ -144,6 +143,7 @@ Deno.serve(async () => {
   let failed = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
+  let firstError: string | null = null;
 
   for (const event of toAnalyze) {
     // Rule 4: pass only the fields the model needs, nothing else.
@@ -160,28 +160,18 @@ Deno.serve(async () => {
     });
 
     try {
-      const response = await anthropic.messages.create({
-        model: AI_MODEL,
-        max_tokens: MAX_RESPONSE_TOKENS,
-        output_config: { format: { type: "json_schema", schema: RESPONSE_SCHEMA } },
-        messages: [
-          {
-            role: "user",
-            content:
-              "You are a business analyst briefing three companies (SupplyX: building materials; " +
-              "Interserv: commercial renovation; Insurance Claims: legal lead gen) on this disaster " +
-              "event. Write in plain English, no jargon. Event data:\n" +
-              prompt,
-          },
-        ],
-      });
+      const { parsed, inputTokens, outputTokens } = await callClaudeJson(
+        ANTHROPIC_API_KEY,
+        "You are a business analyst briefing three companies (SupplyX: building materials; " +
+          "Interserv: commercial renovation; Insurance Claims: legal lead gen) on this disaster " +
+          "event. Write in plain English, no jargon. Event data:\n" +
+          prompt,
+        RESPONSE_SCHEMA,
+        MAX_RESPONSE_TOKENS
+      );
 
-      totalInputTokens += response.usage.input_tokens;
-      totalOutputTokens += response.usage.output_tokens;
-
-      const textBlock = response.content.find((b) => b.type === "text");
-      if (!textBlock || textBlock.type !== "text") throw new Error("No text block in response");
-      const parsed = JSON.parse(textBlock.text);
+      totalInputTokens += inputTokens;
+      totalOutputTokens += outputTokens;
 
       const { error: updateErr } = await supabase
         .from("events")
@@ -200,6 +190,16 @@ Deno.serve(async () => {
     } catch (err) {
       console.error(`Analysis failed for event ${event.id}`, err);
       failed++;
+      if (!firstError) {
+        firstError =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: unknown }).message)
+            : String(err);
+        // Anthropic SDK errors often carry the real API response body here.
+        if (err && typeof err === "object" && "error" in err) {
+          firstError += ` | details: ${JSON.stringify((err as { error: unknown }).error)}`;
+        }
+      }
     }
   }
 
@@ -219,6 +219,7 @@ Deno.serve(async () => {
     candidates_found: ranked.length,
     analyzed,
     failed,
+    first_error: firstError,
     deferred_to_next_cycle: deferred,
     input_tokens: totalInputTokens,
     output_tokens: totalOutputTokens,
