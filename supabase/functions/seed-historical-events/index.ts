@@ -52,11 +52,28 @@ function mapDisasterText(text: string): string {
   return "man_made";
 }
 
-function parseMoney(raw: string | undefined): number | null {
+// NOAA's cost columns are reported in millions of dollars (e.g. "2749.4"
+// means $2,749.4M), not raw dollars.
+function parseMoneyInMillions(raw: string | undefined): number | null {
   if (!raw) return null;
   const cleaned = raw.replace(/[$,]/g, "").trim();
   const value = Number(cleaned);
-  return Number.isFinite(value) ? value : null;
+  return Number.isFinite(value) ? value * 1_000_000 : null;
+}
+
+// NOAA's date columns are YYYYMMDD with no separators (e.g. "19800410"),
+// which the plain Date constructor does not parse correctly. Fall back to
+// generic parsing for any other format this CSV might use in the future.
+function parseNoaaDate(raw: string | undefined): Date | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (/^\d{8}$/.test(trimmed)) {
+    const iso = `${trimmed.slice(0, 4)}-${trimmed.slice(4, 6)}-${trimmed.slice(6, 8)}T00:00:00Z`;
+    const date = new Date(iso);
+    return isNaN(date.getTime()) ? null : date;
+  }
+  const date = new Date(trimmed);
+  return isNaN(date.getTime()) ? null : date;
 }
 
 function slugify(text: string): string {
@@ -86,7 +103,15 @@ Deno.serve(async () => {
   }
   const csvText = await csvRes.text();
 
-  const parsed = Papa.parse<Record<string, string>>(csvText, {
+  // NOAA's export has a couple of title/note lines before the real header
+  // row (e.g. "Weather and Climate Billion-Dollar Disasters..." and "Cost
+  // values are in millions of dollars"). Skip down to the line that starts
+  // with "Name," — the actual column header — before parsing.
+  const lines = csvText.split(/\r?\n/);
+  const headerLineIndex = lines.findIndex((line) => /^name,/i.test(line.trim()));
+  const dataStartingCsv = headerLineIndex > 0 ? lines.slice(headerLineIndex).join("\n") : csvText;
+
+  const parsed = Papa.parse<Record<string, string>>(dataStartingCsv, {
     header: true,
     skipEmptyLines: true,
   });
@@ -124,14 +149,15 @@ Deno.serve(async () => {
       continue;
     }
 
-    const beginDate = new Date(beginDateRaw);
-    if (isNaN(beginDate.getTime())) {
+    const beginDate = parseNoaaDate(beginDateRaw);
+    if (!beginDate) {
       skipped++;
       continue;
     }
+    const endDate = endCol ? parseNoaaDate(row[endCol]) : null;
 
     const category = mapDisasterText(row[typeCol] ?? "");
-    const externalId = `${slugify(name)}-${beginDate.getFullYear()}-${index}`;
+    const externalId = `${slugify(name)}-${beginDate.getUTCFullYear()}-${index}`;
 
     const eventRow = {
       name,
@@ -139,10 +165,10 @@ Deno.serve(async () => {
       sub_type: row[typeCol] ?? null,
       status: "resolved" as const,
       start_date: beginDate.toISOString().slice(0, 10),
-      end_date: endCol && row[endCol] ? new Date(row[endCol]).toISOString().slice(0, 10) : null,
+      end_date: endDate ? endDate.toISOString().slice(0, 10) : null,
       states_affected: [] as string[],
       counties: [] as string[],
-      estimated_damage_usd: costCol ? parseMoney(row[costCol]) : null,
+      estimated_damage_usd: costCol ? parseMoneyInMillions(row[costCol]) : null,
       fatalities: deathsCol ? Number(row[deathsCol]) || null : null,
       confidence_score: "MEDIUM" as const,
       is_historical_seed: true,

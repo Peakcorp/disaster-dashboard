@@ -33,6 +33,7 @@ export function StatusBar({ events }: { events: DisasterEvent[] }) {
 
   const activeCount = events.filter((e) => e.status !== "resolved").length;
   const updatedCount = events.filter((e) => e.is_updated_since_last_refresh).length;
+  const aiAnalyzedCount = events.filter((e) => e.ai_summary).length;
 
   return (
     <div className="glass-card sticky top-0 z-50 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 text-xs text-foreground-muted">
@@ -51,8 +52,11 @@ export function StatusBar({ events }: { events: DisasterEvent[] }) {
         Updated this cycle: <span className="text-warning">{updatedCount}</span>
       </span>
       <span className="ml-auto flex items-center gap-1.5">
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-live" />
-        AI analysis: <span className="text-foreground-muted">Not yet enabled (Phase 2)</span>
+        <span className={`relative inline-flex h-2 w-2 rounded-full ${aiAnalyzedCount > 0 ? "bg-opportunity" : "bg-live"}`} />
+        AI analysis:{" "}
+        <span className={aiAnalyzedCount > 0 ? "text-opportunity" : "text-foreground-muted"}>
+          {aiAnalyzedCount > 0 ? `Active — ${aiAnalyzedCount} analyzed` : "Pending first cycle"}
+        </span>
       </span>
     </div>
   );
