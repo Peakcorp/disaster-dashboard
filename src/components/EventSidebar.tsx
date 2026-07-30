@@ -1,8 +1,8 @@
 "use client";
 
 import type { DisasterEvent } from "@/types/event";
-import { sortBySeverity } from "@/lib/format";
-import { EventCard } from "./EventCard";
+import { groupEvents, sortGroupsBySeverity } from "@/lib/format";
+import { EventGroupCard } from "./EventGroupCard";
 
 export function EventSidebar({
   events,
@@ -13,25 +13,21 @@ export function EventSidebar({
   selectedId: string | null;
   onSelect: (event: DisasterEvent) => void;
 }) {
-  const sorted = sortBySeverity(events);
+  const groups = sortGroupsBySeverity(groupEvents(events));
 
   return (
     <div className="flex h-full flex-col gap-2 overflow-y-auto p-3">
       <p className="px-1 text-xs uppercase tracking-wide text-foreground-muted">
-        {sorted.length} active event{sorted.length === 1 ? "" : "s"}
+        {events.length} active event{events.length === 1 ? "" : "s"}
+        {groups.length !== events.length ? ` · grouped into ${groups.length}` : ""}
       </p>
-      {sorted.length === 0 && (
+      {groups.length === 0 && (
         <p className="px-1 text-sm text-foreground-muted">
           No events yet — waiting for the first refresh cycle.
         </p>
       )}
-      {sorted.map((event) => (
-        <EventCard
-          key={event.id}
-          event={event}
-          selected={event.id === selectedId}
-          onSelect={onSelect}
-        />
+      {groups.map((group) => (
+        <EventGroupCard key={group.key} group={group} selectedId={selectedId} onSelect={onSelect} />
       ))}
     </div>
   );

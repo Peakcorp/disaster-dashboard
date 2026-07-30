@@ -7,6 +7,14 @@ import type { DisasterEvent } from "@/types/event";
 
 const US_CENTER: [number, number] = [39.8283, -98.5795];
 
+// Keeps panning/zoom focused on North America — Alaska/Hawaii/PR fit within
+// this box, so it stays "US-focused" instead of drifting into open ocean or
+// other continents when a user scrolls the map.
+const US_BOUNDS: [[number, number], [number, number]] = [
+  [5, -175],
+  [72, -50],
+];
+
 const STATUS_HEX: Record<DisasterEvent["status"], string> = {
   critical: "#ff3b3b",
   developing: "#ffb300",
@@ -43,13 +51,18 @@ export function DisasterMap({
     <MapContainer
       center={US_CENTER}
       zoom={4}
-      minZoom={3}
+      minZoom={4}
+      maxZoom={10}
+      maxBounds={US_BOUNDS}
+      maxBoundsViscosity={1.0}
+      worldCopyJump={false}
       className="h-full w-full"
       preferCanvas
     >
       <TileLayer
         url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        noWrap
       />
       {plottable.map((event) => (
         <Marker

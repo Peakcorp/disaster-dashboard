@@ -71,25 +71,27 @@ export default function DashboardPage() {
   const activeTabDef = TABS.find((t) => t.id === activeTab)!;
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex h-screen flex-col overflow-hidden">
       <StatusBar events={events} />
       <TabNav active={activeTab} onSelect={setActiveTab} />
 
-      {activeTab === "live-map" ? (
-        <LiveMapTab events={events} loading={loading} />
-      ) : activeTab === "historical" ? (
-        <HistoricalTab />
-      ) : activeTab === "supplyx" ? (
-        <SupplyXTab events={events} />
-      ) : activeTab === "interserv" ? (
-        <InterservTab events={events} />
-      ) : activeTab === "insurance" ? (
-        <InsuranceClaimsTab events={events} />
-      ) : (
-        <div className="flex flex-1 p-6">
-          <ComingSoonTab tab={activeTabDef} />
-        </div>
-      )}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {activeTab === "live-map" ? (
+          <LiveMapTab events={events} loading={loading} />
+        ) : activeTab === "historical" ? (
+          <HistoricalTab />
+        ) : activeTab === "supplyx" ? (
+          <SupplyXTab events={events} />
+        ) : activeTab === "interserv" ? (
+          <InterservTab events={events} />
+        ) : activeTab === "insurance" ? (
+          <InsuranceClaimsTab events={events} />
+        ) : (
+          <div className="flex flex-1 p-6">
+            <ComingSoonTab tab={activeTabDef} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

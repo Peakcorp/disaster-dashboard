@@ -15,8 +15,8 @@ export function LiveMapTab({ events, loading }: { events: DisasterEvent[]; loadi
   const [selected, setSelected] = useState<DisasterEvent | null>(null);
 
   return (
-    <div className="relative flex flex-1">
-      <div className="relative flex-1">
+    <div className="relative flex min-h-0 flex-1 overflow-hidden">
+      <div className="relative min-h-0 flex-1">
         {loading ? (
           <div className="flex h-full items-center justify-center text-foreground-muted">
             Loading live disaster data…
@@ -27,7 +27,7 @@ export function LiveMapTab({ events, loading }: { events: DisasterEvent[]; loadi
         <EventDetailDrawer event={selected} onClose={() => setSelected(null)} />
       </div>
 
-      <aside className="w-96 shrink-0 border-l border-white/10">
+      <aside className="flex w-96 shrink-0 flex-col border-l border-white/10">
         <EventSidebar events={events} selectedId={selected?.id ?? null} onSelect={setSelected} />
       </aside>
     </div>
