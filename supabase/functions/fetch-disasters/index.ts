@@ -239,7 +239,15 @@ async function fetchNwsAlerts(): Promise<NormalizedEvent[]> {
       lng = avgLng;
     }
 
-    const states = Array.from(
+    // areaDesc is a semicolon-separated list of county/zone NAMES (e.g.
+    // "Eastern Pondera and Eastern Teton"), not state codes — using it as
+    // states_affected made every alert look like it had a unique "state",
+    // which defeated state-based grouping entirely. UGC zone/county codes
+    // (e.g. "MTZ001", "MTC003") are prefixed with the real 2-letter state
+    // postal abbreviation, so derive states_affected from those instead.
+    const ugcCodes: string[] = props.geocode?.UGC ?? [];
+    const states = Array.from(new Set(ugcCodes.map((code) => code.slice(0, 2)).filter(Boolean)));
+    const counties = Array.from(
       new Set(String(props.areaDesc ?? "").split(";").map((s) => s.trim()).filter(Boolean))
     );
 
@@ -251,8 +259,8 @@ async function fetchNwsAlerts(): Promise<NormalizedEvent[]> {
       start_date: String(props.onset ?? props.sent ?? new Date().toISOString()).slice(0, 10),
       end_date: props.ends ? String(props.ends).slice(0, 10) : null,
       fema_region: null,
-      states_affected: states,
-      counties: [],
+      states_affected: states.length > 0 ? states : counties.slice(0, 1),
+      counties,
       lat,
       lng,
       estimated_damage_usd: null,

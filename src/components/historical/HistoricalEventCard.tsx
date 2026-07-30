@@ -24,7 +24,14 @@ export function HistoricalEventCard({ event }: { event: DisasterEvent }) {
           </p>
         </div>
         <div className="shrink-0 text-right text-xs">
-          <p className="text-foreground">{formatUsd(event.estimated_damage_usd)}</p>
+          <p className="text-foreground">
+            {formatUsd(event.estimated_damage_usd)}
+            {event.confidence_score === "LOW" && event.estimated_damage_usd != null && (
+              <span className="ml-1 text-foreground-muted" title="AI-estimated — no official cost figure available for this event">
+                (est.)
+              </span>
+            )}
+          </p>
           {event.fatalities != null && (
             <p className="text-foreground-muted">{event.fatalities} fatalities</p>
           )}

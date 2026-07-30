@@ -47,6 +47,14 @@ const RESPONSE_SCHEMA = {
     supplyx_score: { type: "integer", description: "0-100 SupplyX material-demand opportunity score" },
     interserv_score: { type: "integer", description: "0-100 Interserv renovation opportunity score" },
     insurance_claims_score: { type: "integer", description: "0-100 Insurance Claims lead opportunity score" },
+    estimated_damage_usd_guess: {
+      type: ["integer", "null"],
+      description:
+        "Only used when the input's estimated_damage_usd is null (no official figure available, e.g. " +
+        "FEMA declarations don't include one). Your best order-of-magnitude estimate of total damage in " +
+        "raw USD, based on disaster type/category, states/scale affected, and comparable historical events. " +
+        "If the input already has a non-null estimated_damage_usd, set this to null — never override a real figure.",
+    },
   },
   required: [
     "summary",
@@ -54,6 +62,7 @@ const RESPONSE_SCHEMA = {
     "supplyx_score",
     "interserv_score",
     "insurance_claims_score",
+    "estimated_damage_usd_guess",
   ],
   additionalProperties: false,
 };
@@ -136,6 +145,9 @@ Deno.serve(async () => {
           supplyx_score: parsed.supplyx_score,
           interserv_score: parsed.interserv_score,
           insurance_claims_score: parsed.insurance_claims_score,
+          ...(event.estimated_damage_usd == null && parsed.estimated_damage_usd_guess != null
+            ? { estimated_damage_usd: parsed.estimated_damage_usd_guess }
+            : {}),
         })
         .eq("id", event.id);
 
