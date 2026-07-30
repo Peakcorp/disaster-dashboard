@@ -39,11 +39,11 @@ export function sortBySeverity(events: DisasterEvent[]): DisasterEvent[] {
 }
 
 // --- Grouping: NWS issues many overlapping alerts for the same underlying
-// situation (e.g. 3 separate "Fire Weather Watch" issuances for different
-// Montana zones). Grouping by category + sub_type + primary state collapses
-// those into one card without merging genuinely distinct events (a real
-// wildfire incident has a different sub_type than a "Fire Weather Watch"
-// forecast, so they won't be combined even in the same state).
+// situation — a single heat wave produces separate "Extreme Heat Watch" and
+// "Excessive Heat Warning" products, each re-issued per county/zone. Users
+// think of these as one matter ("the heat situation in Montana"), not one
+// row per product text, so the group key deliberately drops sub_type and
+// groups by category + primary state only.
 export interface EventGroup {
   key: string;
   category: DisasterEvent["category"];
@@ -56,7 +56,7 @@ export function groupEvents(events: DisasterEvent[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();
   for (const event of events) {
     const primaryState = event.states_affected[0] ?? "Multi-state";
-    const key = `${event.category}::${event.sub_type ?? "unknown"}::${primaryState}`;
+    const key = `${event.category}::${primaryState}`;
     const existing = groups.get(key);
     if (existing) {
       existing.events.push(event);
@@ -72,11 +72,15 @@ export function groupSeverityRank(group: EventGroup): number {
 }
 
 export function groupLatestUpdate(group: EventGroup): string | null {
-  return group.events.reduce<string | null>((latest, e) => {
+  return groupLatestEvent(group).last_fetched_at;
+}
+
+export function groupLatestEvent(group: EventGroup): DisasterEvent {
+  return group.events.reduce((latest, e) => {
     if (!e.last_fetched_at) return latest;
-    if (!latest || e.last_fetched_at > latest) return e.last_fetched_at;
+    if (!latest.last_fetched_at || e.last_fetched_at > latest.last_fetched_at) return e;
     return latest;
-  }, null);
+  }, group.events[0]);
 }
 
 export function groupHasUpdate(group: EventGroup): boolean {
