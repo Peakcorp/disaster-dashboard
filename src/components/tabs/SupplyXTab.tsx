@@ -3,16 +3,15 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { DisasterEvent, EventMaterial } from "@/types/event";
-import type { EventContact, PriceIndexPoint } from "@/types/company";
+import type { EventContact } from "@/types/company";
 import { MaterialDemandPanel } from "@/components/supplyx/MaterialDemandPanel";
-import { ProcurementAlerts } from "@/components/supplyx/ProcurementAlerts";
-import { PriceIntelligenceChart } from "@/components/supplyx/PriceIntelligenceChart";
+import { MaterialsNeededList } from "@/components/supplyx/MaterialsNeededList";
+import { MaterialPriceReference } from "@/components/supplyx/MaterialPriceReference";
 import { ContactsList } from "@/components/company/ContactsList";
 
 export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
   const [materials, setMaterials] = useState<EventMaterial[]>([]);
   const [contacts, setContacts] = useState<EventContact[]>([]);
-  const [prices, setPrices] = useState<PriceIndexPoint[]>([]);
 
   const activeEvents = events.filter((e) => e.status !== "resolved");
   const eventIds = activeEvents.map((e) => e.id);
@@ -42,17 +41,6 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIds.join(",")]);
 
-  useEffect(() => {
-    supabase
-      .from("price_index_history")
-      .select("*")
-      .order("date", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) console.error("Failed to load price_index_history", error);
-        setPrices((data as PriceIndexPoint[]) ?? []);
-      });
-  }, []);
-
   const churches = contacts.filter((c) => c.company_type === "church");
   const targetClients = contacts.filter((c) =>
     ["contractor", "restoration_company", "property_management"].includes(c.company_type)
@@ -63,15 +51,15 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="glass-card rounded-lg p-4">
           <p className="mb-3 text-xs uppercase tracking-wide text-foreground-muted">
-            Act Now — Pre-Purchase Alerts
+            Materials Needed — by Disaster Category
           </p>
-          <ProcurementAlerts events={activeEvents} materials={materials} />
+          <MaterialsNeededList events={activeEvents} materials={materials} />
         </div>
         <div className="glass-card rounded-lg p-4">
           <p className="mb-3 text-xs uppercase tracking-wide text-foreground-muted">
-            Price Intelligence (FRED, 12-month)
+            US Price Reference — by Disaster Category
           </p>
-          <PriceIntelligenceChart points={prices} />
+          <MaterialPriceReference events={activeEvents} materials={materials} />
         </div>
       </div>
 
