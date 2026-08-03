@@ -157,6 +157,13 @@ Deno.serve(async () => {
     const endDate = endCol ? parseNoaaDate(row[endCol]) : null;
 
     const category = mapDisasterText(row[typeCol] ?? "");
+    // Heat/drought is out of scope — the three consumers (SupplyX materials,
+    // Interserv renovation, Insurance Claims referrals) are all
+    // property-damage-driven, which heat advisories don't map to.
+    if (category === "extreme_heat") {
+      skipped++;
+      continue;
+    }
     const externalId = `${slugify(name)}-${beginDate.getUTCFullYear()}-${index}`;
 
     const eventRow = {

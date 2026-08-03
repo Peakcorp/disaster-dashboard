@@ -56,7 +56,12 @@ interface NormalizedEvent {
   external_id: string;
 }
 
-function mapFemaIncidentType(incidentType: string): DisasterCategory {
+// Heat/drought is deliberately excluded (returns null, caller skips) — the
+// project's three consumers (SupplyX materials, Interserv renovation,
+// Insurance Claims referrals) are all property-damage-driven, and heat
+// advisories don't map to that the way a hurricane/tornado/flood/wildfire
+// does.
+function mapFemaIncidentType(incidentType: string): DisasterCategory | null {
   const t = incidentType.toLowerCase();
   if (t.includes("hurricane") || t.includes("tropical")) return "hurricane";
   if (t.includes("tornado")) return "tornado";
@@ -67,7 +72,7 @@ function mapFemaIncidentType(incidentType: string): DisasterCategory {
   }
   if (t.includes("earthquake")) return "earthquake";
   if (t.includes("mud") || t.includes("landslide")) return "landslide";
-  if (t.includes("drought") || t.includes("heat")) return "extreme_heat";
+  if (t.includes("drought") || t.includes("heat")) return null;
   if (
     t.includes("chemical") ||
     t.includes("terrorist") ||
@@ -80,20 +85,26 @@ function mapFemaIncidentType(incidentType: string): DisasterCategory {
   return "man_made";
 }
 
+// NWS "fire" alerts (Fire Weather Watch / Red Flag Warning) are risk
+// forecasts for elevated fire-danger conditions, not a confirmed burning
+// wildfire — tracking them as "wildfire" events surfaced forecast noise
+// (often over uninhabited wilderness) rather than actual property-damaging
+// fires. Real wildfire incidents are covered via FEMA disaster declarations
+// instead, which already require substantiated damage to be declared.
+// Heat is excluded for the same property-damage-relevance reason as FEMA's.
 function mapNwsEventType(eventType: string): DisasterCategory | null {
   const t = eventType.toLowerCase();
   if (t.includes("hurricane") || t.includes("tropical storm")) return "hurricane";
   if (t.includes("tornado")) return "tornado";
-  if (t.includes("fire")) return "wildfire";
   if (t.includes("flood")) return "flood";
   if (t.includes("winter") || t.includes("ice storm") || t.includes("blizzard") || t.includes("freez")) {
     return "winter_storm";
   }
   if (t.includes("earthquake")) return "earthquake";
   if (t.includes("hail")) return "hail";
-  if (t.includes("heat")) return "extreme_heat";
   // Deliberately excludes generic/non-disaster alert types (e.g. Small Craft
-  // Advisory, Air Quality) by returning null — caller skips those.
+  // Advisory, Air Quality), fire-weather forecasts, and heat — caller skips
+  // anything this returns null for.
   return null;
 }
 
@@ -185,13 +196,16 @@ async function fetchFemaDeclarations(): Promise<NormalizedEvent[]> {
     const counties = Array.from(
       new Set(group.map((r) => String(r.designatedArea)).filter((a) => a && a !== "undefined"))
     );
+    const category = mapFemaIncidentType(String(first.incidentType ?? ""));
+    if (!category) continue;
+
     const declarationDate = String(first.declarationDate).slice(0, 10);
     const daysSinceDeclaration =
       (Date.now() - new Date(declarationDate).getTime()) / (1000 * 60 * 60 * 24);
 
     events.push({
       name: `${first.declarationTitle ?? first.incidentType ?? "Disaster"} — ${states.join(", ")}`,
-      category: mapFemaIncidentType(String(first.incidentType ?? "")),
+      category,
       sub_type: String(first.incidentType ?? null),
       status: daysSinceDeclaration <= 30 ? "critical" : "developing",
       start_date: String(first.incidentBeginDate ?? declarationDate).slice(0, 10),
@@ -227,6 +241,12 @@ async function fetchNwsAlerts(): Promise<NormalizedEvent[]> {
     const props = feature.properties;
     const category = mapNwsEventType(String(props.event ?? ""));
     if (!category) continue;
+
+    // Only Severe/Extreme NWS severity — Moderate/Minor products (e.g. a
+    // routine Flood Advisory vs. a Flash Flood Warning) are exactly the
+    // "small fire / small flood" noise this project isn't meant to track.
+    const severity = String(props.severity ?? "").toLowerCase();
+    if (severity !== "severe" && severity !== "extreme") continue;
 
     let lat: number | null = null;
     let lng: number | null = null;

@@ -88,6 +88,10 @@ Deno.serve(async () => {
     );
     const declarationDate = String(first.declarationDate).slice(0, 10);
     const category = mapFemaIncidentType(String(first.incidentType ?? ""));
+    // Heat/drought is out of scope — the three consumers (SupplyX materials,
+    // Interserv renovation, Insurance Claims referrals) are all
+    // property-damage-driven, which heat advisories don't map to.
+    if (category === "extreme_heat") continue;
     const name = `${first.declarationTitle ?? first.incidentType ?? "Disaster"} — ${states.join(", ")}`;
 
     const eventRow = {
