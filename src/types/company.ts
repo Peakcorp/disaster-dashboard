@@ -36,6 +36,8 @@ export interface EventContact {
   target_company: TargetCompany;
   status: ContactStatus;
   notes: string | null;
+  phone: string | null;
+  website: string | null;
 }
 
 export interface ReferralPartner {

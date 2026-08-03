@@ -15,7 +15,7 @@ const TYPE_LABELS: Record<ContactCompanyType, string> = {
   property_management: "Property Management",
 };
 
-const STATUS_CYCLE: ContactStatus[] = ["not_contacted", "contacted", "engaged", "referred", "closed"];
+const STATUS_OPTIONS: ContactStatus[] = ["not_contacted", "contacted", "engaged", "referred", "closed"];
 
 const STATUS_STYLES: Record<ContactStatus, string> = {
   not_contacted: "bg-white/5 text-foreground-muted",
@@ -34,16 +34,17 @@ export function ContactsList({
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusOverrides, setStatusOverrides] = useState<Record<string, ContactStatus>>({});
+  const [errorId, setErrorId] = useState<string | null>(null);
 
-  async function cycleStatus(contact: EventContact, e: React.MouseEvent) {
-    e.stopPropagation();
+  async function updateStatus(contact: EventContact, next: ContactStatus) {
     const current = statusOverrides[contact.id] ?? contact.status;
-    const next = STATUS_CYCLE[(STATUS_CYCLE.indexOf(current) + 1) % STATUS_CYCLE.length];
     setStatusOverrides((prev) => ({ ...prev, [contact.id]: next }));
+    setErrorId(null);
     const { error } = await supabase.from("event_contacts").update({ status: next }).eq("id", contact.id);
     if (error) {
       console.error("Failed to update contact status", error);
       setStatusOverrides((prev) => ({ ...prev, [contact.id]: current })); // revert on failure
+      setErrorId(contact.id);
     }
   }
 
@@ -69,19 +70,49 @@ export function ContactsList({
             >
               <div>
                 <p className="text-foreground">{contact.name}</p>
-                <p className="text-xs text-foreground-muted">
-                  {TYPE_LABELS[contact.company_type]}
-                  {contact.address ? ` · ${contact.address}` : ""}
-                </p>
+                <p className="text-xs text-foreground-muted">{TYPE_LABELS[contact.company_type]}</p>
+                {contact.address && <p className="mt-0.5 text-xs text-foreground-muted">{contact.address}</p>}
               </div>
-              <button
-                onClick={(e) => cycleStatus(contact, e)}
-                title="Click to advance referral status"
-                className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] uppercase transition hover:brightness-125 ${STATUS_STYLES[status]}`}
+              <select
+                value={status}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => updateStatus(contact, e.target.value as ContactStatus)}
+                title="Referral status"
+                className={`shrink-0 rounded border-none px-1.5 py-0.5 text-[10px] uppercase transition hover:brightness-125 ${STATUS_STYLES[status]}`}
               >
-                {status.replace("_", " ")}
-              </button>
+                {STATUS_OPTIONS.map((option) => (
+                  <option key={option} value={option} className="bg-background text-foreground normal-case">
+                    {option.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground-muted">
+              {contact.phone && (
+                <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()} className="text-live hover:underline">
+                  {contact.phone}
+                </a>
+              )}
+              {contact.website && (
+                <a
+                  href={contact.website}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="text-live hover:underline"
+                >
+                  Website
+                </a>
+              )}
+              {!contact.phone && !contact.website && <span>No phone/website on file</span>}
+            </div>
+
+            {errorId === contact.id && (
+              <p className="mt-1 text-xs text-critical">
+                Status update failed — the database may need the write-access migration applied.
+              </p>
+            )}
 
             {expanded && (
               <div className="mt-2 border-t border-white/10 pt-2 text-xs text-foreground-muted">
@@ -93,9 +124,6 @@ export function ContactsList({
                   </p>
                 )}
                 {contact.notes && <p>Notes: {contact.notes}</p>}
-                <p className="mt-1 text-[10px] text-foreground-muted">
-                  Click the status badge to advance: not contacted → contacted → engaged → referred → closed.
-                </p>
               </div>
             )}
           </li>

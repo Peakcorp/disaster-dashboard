@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { DisasterEvent } from "@/types/event";
+import type { DisasterEvent, NewsArticle } from "@/types/event";
 import { formatUsd, formatRelativeTime } from "@/lib/format";
 import { CLAIM_TYPES_BY_CATEGORY, stateLawFavorability, estimateClaimValuePoolUsd } from "@/lib/company";
 
@@ -10,7 +10,7 @@ const FAVORABILITY_LABEL: Record<"high" | "medium", string> = {
   medium: "Standard policyholder protections",
 };
 
-export function ClaimPoolCard({ event }: { event: DisasterEvent }) {
+export function ClaimPoolCard({ event, newsArticles = [] }: { event: DisasterEvent; newsArticles?: NewsArticle[] }) {
   const [expanded, setExpanded] = useState(false);
   const claimTypes = CLAIM_TYPES_BY_CATEGORY[event.category] ?? ["Structural damage"];
   const primaryState = event.states_affected[0];
@@ -18,7 +18,15 @@ export function ClaimPoolCard({ event }: { event: DisasterEvent }) {
   const valuePoolUsd = estimateClaimValuePoolUsd(event.insurance_claims_filed_est);
 
   return (
-    <button onClick={() => setExpanded((e) => !e)} className="glass-card w-full rounded-md p-3 text-left text-sm">
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setExpanded((e) => !e)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") setExpanded((prev) => !prev);
+      }}
+      className="glass-card w-full cursor-pointer rounded-md p-3 text-left text-sm"
+    >
       <div className="flex items-start justify-between gap-2">
         <p className="text-foreground">{event.name}</p>
         <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase text-foreground-muted">
@@ -59,8 +67,35 @@ export function ClaimPoolCard({ event }: { event: DisasterEvent }) {
             <p>States affected: {event.states_affected.join(", ") || "—"}</p>
             <p>Last updated: {formatRelativeTime(event.last_fetched_at)}</p>
           </div>
+
+          <div className="mt-3 border-t border-white/10 pt-2">
+            <p className="mb-1 text-foreground">Related news — where this is impacting</p>
+            {newsArticles.length === 0 ? (
+              <p>No linked articles for this event yet.</p>
+            ) : (
+              <ul className="flex flex-col gap-1">
+                {newsArticles.map((article) => (
+                  <li key={article.id}>
+                    <a
+                      href={article.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-live hover:underline"
+                    >
+                      {article.headline}
+                    </a>
+                    <span className="ml-1">
+                      ({article.source}
+                      {article.published_at ? `, ${formatRelativeTime(article.published_at)}` : ""})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
       )}
-    </button>
+    </div>
   );
 }

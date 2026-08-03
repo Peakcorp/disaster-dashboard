@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DisasterEvent, DisasterCategory, EventMaterial } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
 import { getMaterialPrice, formatMaterialPrice } from "@/lib/materialPrices";
@@ -9,6 +9,12 @@ interface CategoryMaterials {
   category: DisasterCategory;
   materials: string[];
 }
+
+type SortOption = "item_count" | "category_az";
+const SORT_LABELS: Record<SortOption, string> = {
+  item_count: "Most Materials Priced",
+  category_az: "Category: A to Z",
+};
 
 function buildCategoryMaterials(events: DisasterEvent[], materials: EventMaterial[]): CategoryMaterials[] {
   const activeCategories = new Set(events.map((e) => e.category));
@@ -21,9 +27,17 @@ function buildCategoryMaterials(events: DisasterEvent[], materials: EventMateria
     byCategory.set(material.disaster_type, list);
   }
 
-  return Array.from(byCategory.entries())
-    .map(([category, list]) => ({ category, materials: list.sort() }))
-    .sort((a, b) => b.materials.length - a.materials.length);
+  return Array.from(byCategory.entries()).map(([category, list]) => ({ category, materials: list.sort() }));
+}
+
+function sortGroups(groups: CategoryMaterials[], sortBy: SortOption): CategoryMaterials[] {
+  const sorted = [...groups];
+  switch (sortBy) {
+    case "item_count":
+      return sorted.sort((a, b) => b.materials.length - a.materials.length);
+    case "category_az":
+      return sorted.sort((a, b) => CATEGORY_LABELS[a.category].localeCompare(CATEGORY_LABELS[b.category]));
+  }
 }
 
 export function MaterialPriceReference({
@@ -34,7 +48,11 @@ export function MaterialPriceReference({
   materials: EventMaterial[];
 }) {
   const [expanded, setExpanded] = useState<DisasterCategory | null>(null);
-  const groups = buildCategoryMaterials(events, materials);
+  const [sortBy, setSortBy] = useState<SortOption>("item_count");
+  const groups = useMemo(
+    () => sortGroups(buildCategoryMaterials(events, materials), sortBy),
+    [events, materials, sortBy]
+  );
 
   if (groups.length === 0) {
     return (
@@ -46,6 +64,17 @@ export function MaterialPriceReference({
 
   return (
     <div className="flex flex-col gap-2">
+      <select
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value as SortOption)}
+        className="glass-card self-start rounded-md px-2 py-1 text-xs text-foreground"
+      >
+        {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
+          <option key={option} value={option}>
+            Sort: {SORT_LABELS[option]}
+          </option>
+        ))}
+      </select>
       <ul className="flex flex-col gap-2">
         {groups.map((group) => {
           const isOpen = expanded === group.category;

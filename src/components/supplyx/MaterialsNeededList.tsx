@@ -1,8 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { DisasterEvent, DisasterCategory, EventMaterial } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
+
+type SortOption = "event_count" | "category_az" | "item_count";
+const SORT_LABELS: Record<SortOption, string> = {
+  event_count: "Most Active Events",
+  item_count: "Most Materials Listed",
+  category_az: "Category: A to Z",
+};
 
 interface CategoryGroup {
   category: DisasterCategory;
@@ -35,7 +42,21 @@ function buildGroups(events: DisasterEvent[], materials: EventMaterial[]): Categ
     group.states = Array.from(new Set(group.states)).sort();
   }
 
-  return Array.from(groups.values()).sort((a, b) => b.eventCount - a.eventCount);
+  return Array.from(groups.values());
+}
+
+function sortGroups(groups: CategoryGroup[], sortBy: SortOption): CategoryGroup[] {
+  const sorted = [...groups];
+  switch (sortBy) {
+    case "event_count":
+      return sorted.sort((a, b) => b.eventCount - a.eventCount);
+    case "item_count":
+      return sorted.sort(
+        (a, b) => b.destroyed.length + b.consumed.length - (a.destroyed.length + a.consumed.length)
+      );
+    case "category_az":
+      return sorted.sort((a, b) => CATEGORY_LABELS[a.category].localeCompare(CATEGORY_LABELS[b.category]));
+  }
 }
 
 export function MaterialsNeededList({
@@ -46,7 +67,8 @@ export function MaterialsNeededList({
   materials: EventMaterial[];
 }) {
   const [expanded, setExpanded] = useState<DisasterCategory | null>(null);
-  const groups = buildGroups(events, materials);
+  const [sortBy, setSortBy] = useState<SortOption>("event_count");
+  const groups = useMemo(() => sortGroups(buildGroups(events, materials), sortBy), [events, materials, sortBy]);
 
   if (groups.length === 0) {
     return (
@@ -57,7 +79,19 @@ export function MaterialsNeededList({
   }
 
   return (
-    <ul className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
+      <select
+        value={sortBy}
+        onChange={(e) => setSortBy(e.target.value as SortOption)}
+        className="glass-card self-start rounded-md px-2 py-1 text-xs text-foreground"
+      >
+        {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
+          <option key={option} value={option}>
+            Sort: {SORT_LABELS[option]}
+          </option>
+        ))}
+      </select>
+      <ul className="flex flex-col gap-2">
       {groups.map((group) => {
         const isOpen = expanded === group.category;
         const stateSummary =
@@ -116,6 +150,7 @@ export function MaterialsNeededList({
           </li>
         );
       })}
-    </ul>
+      </ul>
+    </div>
   );
 }
