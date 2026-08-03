@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { DisasterEvent } from "@/types/event";
 import type { ReferralPartner, StateRegulatoryInfo } from "@/types/company";
-import { ClaimPoolCard } from "@/components/insurance/ClaimPoolCard";
+import { ClaimCategoryList } from "@/components/insurance/ClaimCategoryCard";
 import { ReferralPartnersPanel } from "@/components/insurance/ReferralPartnersPanel";
 import { StateRegulatoryPanel } from "@/components/insurance/StateRegulatoryPanel";
 import { sortBySeverity } from "@/lib/format";
@@ -44,17 +44,9 @@ export function InsuranceClaimsTab({ events }: { events: DisasterEvent[] }) {
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="glass-card rounded-lg p-4">
         <p className="mb-3 text-xs uppercase tracking-wide text-foreground-muted">
-          Active Claim Pool Estimation
+          Active Claim Pool Estimation — by Disaster Category
         </p>
-        {activeEvents.length === 0 ? (
-          <p className="text-sm text-foreground-muted">No active events right now.</p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {activeEvents.map((event) => (
-              <ClaimPoolCard key={event.id} event={event} />
-            ))}
-          </div>
-        )}
+        <ClaimCategoryList events={activeEvents} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
