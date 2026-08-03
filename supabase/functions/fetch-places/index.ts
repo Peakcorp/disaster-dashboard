@@ -130,12 +130,20 @@ Deno.serve(async () => {
   // exclusion (an event could drop out of the window before ever being
   // reached, while a stale one keeps reappearing). Sorting by id as a
   // secondary key makes the window stable across invocations.
+  // estimated_damage_usd is essentially never populated for live events
+  // (neither the FEMA nor NWS ingestion path sets it, and analyze-events'
+  // AI pass doesn't either) — ordering by it was effectively ordering by
+  // the id tiebreaker alone, with no relevance signal at all. interserv_score
+  // and supplyx_score (set by analyze-events) actually vary per event and
+  // are what Tab 3/4 use to decide what's worth surfacing, so prioritize
+  // contact lookups for the events that will actually be shown there first.
   const { data: candidateEvents, error: fetchErr } = await supabase
     .from("events")
-    .select("id, category, status, states_affected, lat, lng, estimated_damage_usd")
+    .select("id, category, status, states_affected, lat, lng, estimated_damage_usd, interserv_score, supplyx_score")
     .neq("status", "resolved")
     .eq("is_historical_seed", false)
-    .order("estimated_damage_usd", { ascending: false, nullsFirst: false })
+    .order("interserv_score", { ascending: false, nullsFirst: false })
+    .order("supplyx_score", { ascending: false, nullsFirst: false })
     .order("id", { ascending: true })
     .limit(500);
 

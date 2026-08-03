@@ -22,8 +22,21 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
   const [contacts, setContacts] = useState<EventContact[]>([]);
   const [propertyType, setPropertyType] = useState<ContactCompanyType | "all">("all");
 
+  // estimated_damage_usd is essentially never populated for live events —
+  // neither the FEMA/NWS ingestion nor the AI analysis pass sets it — so
+  // gating on a $500K damage figure alone left this permanently empty for
+  // live data. interserv_score (AI-assigned per-event opportunity score,
+  // 0-100) is what's actually populated and is a more direct fit anyway;
+  // keep the damage threshold as an alternate qualifier for rows that do
+  // have a real figure (historical/FEMA-enriched events).
   const activeEvents = useMemo(
-    () => events.filter((e) => e.status !== "resolved" && e.estimated_damage_usd != null && e.estimated_damage_usd >= 500_000),
+    () =>
+      events.filter(
+        (e) =>
+          e.status !== "resolved" &&
+          ((e.estimated_damage_usd != null && e.estimated_damage_usd >= 500_000) ||
+            (e.interserv_score != null && e.interserv_score >= 60))
+      ),
     [events]
   );
   const eventIds = useMemo(() => activeEvents.map((e) => e.id), [activeEvents]);
