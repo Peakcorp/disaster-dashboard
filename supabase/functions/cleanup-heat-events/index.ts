@@ -20,18 +20,39 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 Deno.serve(async () => {
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const { data: deleted, error } = await supabase
+  const { data: heatDeleted, error: heatErr } = await supabase
     .from("events")
     .delete()
     .eq("category", "extreme_heat")
     .select("id");
 
-  if (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  if (heatErr) {
+    return new Response(JSON.stringify({ error: heatErr.message }), { status: 500 });
+  }
+
+  // Existing NWS-sourced "wildfire" rows are all Fire Weather Watch / Red
+  // Flag Warning fire-risk forecasts (NWS never had a real fire-incident
+  // product) — mapNwsEventType no longer classifies these as wildfire, but
+  // rows whose content hasn't changed since ingestion never get
+  // re-processed by fetch-disasters, so they need this one-time purge too.
+  // Real (FEMA-sourced) wildfire declarations are untouched.
+  const { data: fireForecastDeleted, error: fireErr } = await supabase
+    .from("events")
+    .delete()
+    .eq("category", "wildfire")
+    .eq("external_source", "nws")
+    .select("id");
+
+  if (fireErr) {
+    return new Response(JSON.stringify({ error: fireErr.message }), { status: 500 });
   }
 
   return new Response(
-    JSON.stringify({ deleted: deleted?.length ?? 0, completed_at: new Date().toISOString() }),
+    JSON.stringify({
+      heat_deleted: heatDeleted?.length ?? 0,
+      nws_fire_forecast_deleted: fireForecastDeleted?.length ?? 0,
+      completed_at: new Date().toISOString(),
+    }),
     { headers: { "Content-Type": "application/json" } }
   );
 });
