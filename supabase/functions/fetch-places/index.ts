@@ -64,7 +64,7 @@ async function searchPlaces(textQuery: string, locationBias?: { lat: number; lng
   };
   if (locationBias) {
     body.locationBias = {
-      circle: { center: { latitude: locationBias.lat, longitude: locationBias.lng }, radius: 80_000 },
+      circle: { center: { latitude: locationBias.lat, longitude: locationBias.lng }, radius: 50_000 },
     };
   }
 
@@ -79,11 +79,12 @@ async function searchPlaces(textQuery: string, locationBias?: { lat: number; lng
   });
 
   if (!res.ok) {
-    console.error("Google Places API error", res.status, await res.text());
-    return [];
+    const text = await res.text();
+    console.error("Google Places API error", res.status, text);
+    return { places: [] as PlaceResult[], error: `HTTP ${res.status}: ${text.slice(0, 300)}` };
   }
   const json = await res.json();
-  return (json.places ?? []) as PlaceResult[];
+  return { places: (json.places ?? []) as PlaceResult[], error: null as string | null };
 }
 
 Deno.serve(async () => {
@@ -101,21 +102,55 @@ Deno.serve(async () => {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-  const { data: events, error: fetchErr } = await supabase
+  // Without this, every invocation re-picked the same top-N-by-damage
+  // events (there's no other ordering signal to advance past them),
+  // so re-running never reached new events. Excluding events that
+  // already have at least one contact row lets each invocation make
+  // real progress through the backlog.
+  // The project's PostgREST "max rows" setting caps every request at 1000
+  // regardless of a client-side .limit() — event_contacts blows past that
+  // after a handful of runs (up to 40 rows per event), which was silently
+  // truncating this lookup and making the exclusion below miss
+  // already-processed events, causing the same 5 to be reprocessed forever.
+  // Page through with .range() to actually get everything.
+  const alreadyProcessed = new Set<string>();
+  for (let page = 0; ; page++) {
+    const { data: pageRows } = await supabase
+      .from("event_contacts")
+      .select("event_id")
+      .range(page * 1000, page * 1000 + 999);
+    for (const row of pageRows ?? []) alreadyProcessed.add(row.event_id as string);
+    if (!pageRows || pageRows.length < 1000) break;
+  }
+
+  // estimated_damage_usd is null for most live (NWS-sourced) events, so
+  // without a tiebreaker Postgres has no defined order among those ties —
+  // successive calls could return them in a different order, making the
+  // "top 200" window shift under us and defeating the alreadyProcessed
+  // exclusion (an event could drop out of the window before ever being
+  // reached, while a stale one keeps reappearing). Sorting by id as a
+  // secondary key makes the window stable across invocations.
+  const { data: candidateEvents, error: fetchErr } = await supabase
     .from("events")
     .select("id, category, status, states_affected, lat, lng, estimated_damage_usd")
     .neq("status", "resolved")
     .eq("is_historical_seed", false)
     .order("estimated_damage_usd", { ascending: false, nullsFirst: false })
-    .limit(MAX_EVENTS_PER_CYCLE);
+    .order("id", { ascending: true })
+    .limit(500);
 
   if (fetchErr) {
     return new Response(JSON.stringify({ error: fetchErr.message }), { status: 500 });
   }
 
+  const events = (candidateEvents ?? [])
+    .filter((e) => !alreadyProcessed.has(e.id))
+    .slice(0, MAX_EVENTS_PER_CYCLE);
+
   let eventsProcessed = 0;
   let contactsUpserted = 0;
   let failed = 0;
+  let firstError: string | null = null;
 
   for (const event of events ?? []) {
     const stateName = event.states_affected?.[0]
@@ -130,7 +165,12 @@ Deno.serve(async () => {
       const locationBias = event.lat != null && event.lng != null ? { lat: event.lat, lng: event.lng } : undefined;
 
       try {
-        const places = await searchPlaces(textQuery, locationBias);
+        const { places, error: searchError } = await searchPlaces(textQuery, locationBias);
+        if (searchError) {
+          failed++;
+          if (!firstError) firstError = searchError;
+          continue;
+        }
         const rows = places
           .filter((p) => p.id && p.displayName?.text)
           .map((p) => ({
@@ -152,6 +192,7 @@ Deno.serve(async () => {
           if (upsertErr) {
             console.error(`Upsert failed for event ${event.id} / ${companyType}`, upsertErr);
             failed++;
+            if (!firstError) firstError = upsertErr.message;
             continue;
           }
           contactsUpserted += rows.length;
@@ -159,15 +200,22 @@ Deno.serve(async () => {
       } catch (err) {
         console.error(`Places search failed for event ${event.id} / ${companyType}`, err);
         failed++;
+        if (!firstError) firstError = err instanceof Error ? err.message : String(err);
       }
     }
   }
+
+  const remainingBacklog = candidateEvents
+    ? candidateEvents.filter((e) => !alreadyProcessed.has(e.id)).length - eventsProcessed
+    : 0;
 
   return new Response(
     JSON.stringify({
       events_processed: eventsProcessed,
       contacts_upserted: contactsUpserted,
+      remaining_backlog: Math.max(0, remainingBacklog),
       failed,
+      first_error: firstError,
       completed_at: new Date().toISOString(),
     }),
     { headers: { "Content-Type": "application/json" } }
