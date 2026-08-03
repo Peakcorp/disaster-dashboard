@@ -15,8 +15,12 @@ export function LiveMapTab({ events, loading }: { events: DisasterEvent[]; loadi
   const [selected, setSelected] = useState<DisasterEvent | null>(null);
 
   return (
-    <div className="relative flex min-h-0 flex-1 overflow-hidden">
-      <div className="relative min-h-0 flex-1">
+    <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row">
+      {/* Below md, the map gets a fixed share of the viewport (not flex-1)
+          so the sidebar — the second flex-col child — still gets room to
+          take the rest and scroll independently, matching the side-by-side
+          behavior at md+ where the map is flex-1 in a row instead. */}
+      <div className="relative h-[42vh] shrink-0 md:h-auto md:min-h-0 md:flex-1">
         {loading ? (
           <div className="flex h-full items-center justify-center text-foreground-muted">
             Loading live disaster data…
@@ -27,7 +31,7 @@ export function LiveMapTab({ events, loading }: { events: DisasterEvent[]; loadi
         <EventDetailDrawer event={selected} onClose={() => setSelected(null)} />
       </div>
 
-      <aside className="flex w-96 shrink-0 flex-col border-l border-white/10">
+      <aside className="flex min-h-0 flex-1 flex-col border-t border-white/10 md:w-96 md:flex-none md:border-l md:border-t-0">
         <EventSidebar events={events} selectedId={selected?.id ?? null} onSelect={setSelected} />
       </aside>
     </div>

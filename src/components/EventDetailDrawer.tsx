@@ -31,8 +31,12 @@ export function EventDetailDrawer({
   if (!event) return null;
 
   return (
+    // Fixed full-screen below md — the map's own container is only ~42vh
+    // tall on mobile (see LiveMapTab), so an absolutely-positioned panel
+    // confined to that box would be too cramped for the AI briefing/news
+    // content. At md+ it reverts to the original inset panel over the map.
     <div
-      className="absolute right-0 top-0 z-[1000] h-full w-full max-w-sm overflow-y-auto border-l border-white/10 p-5 shadow-2xl"
+      className="fixed inset-0 z-[1000] overflow-y-auto p-5 shadow-2xl md:absolute md:inset-auto md:right-0 md:top-0 md:h-full md:w-full md:max-w-sm md:border-l md:border-white/10"
       style={{ background: "rgba(8, 12, 24, 0.97)", backdropFilter: "blur(12px)" }}
     >
       <button
