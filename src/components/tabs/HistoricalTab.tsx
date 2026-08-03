@@ -9,11 +9,51 @@ import { SeasonalDangerAlerts } from "@/components/historical/SeasonalDangerAler
 import { TrendLineChart } from "@/components/historical/TrendLineChart";
 import { HistoricalEventCard } from "@/components/historical/HistoricalEventCard";
 
+type SortOption =
+  | "damage_desc"
+  | "damage_asc"
+  | "year_desc"
+  | "year_asc"
+  | "fatalities_desc"
+  | "name_asc";
+
+const SORT_LABELS: Record<SortOption, string> = {
+  damage_desc: "Damage: High to Low",
+  damage_asc: "Damage: Low to High",
+  year_desc: "Year: Newest First",
+  year_asc: "Year: Oldest First",
+  fatalities_desc: "Fatalities: Highest First",
+  name_asc: "Name: A to Z",
+};
+
+function sortEvents(events: DisasterEvent[], sortBy: SortOption): DisasterEvent[] {
+  const sorted = [...events];
+  switch (sortBy) {
+    case "damage_desc":
+      return sorted.sort((a, b) => (b.estimated_damage_usd ?? -1) - (a.estimated_damage_usd ?? -1));
+    case "damage_asc":
+      return sorted.sort(
+        (a, b) =>
+          (a.estimated_damage_usd ?? Number.POSITIVE_INFINITY) -
+          (b.estimated_damage_usd ?? Number.POSITIVE_INFINITY)
+      );
+    case "year_desc":
+      return sorted.sort((a, b) => b.start_date.localeCompare(a.start_date));
+    case "year_asc":
+      return sorted.sort((a, b) => a.start_date.localeCompare(b.start_date));
+    case "fatalities_desc":
+      return sorted.sort((a, b) => (b.fatalities ?? -1) - (a.fatalities ?? -1));
+    case "name_asc":
+      return sorted.sort((a, b) => a.name.localeCompare(b.name));
+  }
+}
+
 export function HistoricalTab() {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState<DisasterCategory | "all">("all");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState<SortOption>("damage_desc");
 
   useEffect(() => {
     let isMounted = true;
@@ -49,6 +89,8 @@ export function HistoricalTab() {
     () => Array.from(new Set(events.map((e) => e.category))).sort(),
     [events]
   );
+
+  const sorted = useMemo(() => sortEvents(filtered, sortBy), [filtered, sortBy]);
 
   if (loading) {
     return (
@@ -112,13 +154,24 @@ export function HistoricalTab() {
           placeholder="Search by name or state…"
           className="glass-card min-w-[220px] flex-1 rounded-md px-3 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
         />
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value as SortOption)}
+          className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground"
+        >
+          {(Object.keys(SORT_LABELS) as SortOption[]).map((option) => (
+            <option key={option} value={option}>
+              Sort: {SORT_LABELS[option]}
+            </option>
+          ))}
+        </select>
         <span className="text-xs text-foreground-muted">
           {filtered.length} of {events.length} events
         </span>
       </div>
 
       <div className="flex flex-col gap-2">
-        {filtered.map((event) => (
+        {sorted.map((event) => (
           <HistoricalEventCard key={event.id} event={event} />
         ))}
       </div>
