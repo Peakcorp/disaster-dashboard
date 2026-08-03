@@ -55,6 +55,8 @@ interface PlaceResult {
   displayName?: { text: string };
   formattedAddress?: string;
   location?: { latitude: number; longitude: number };
+  nationalPhoneNumber?: string;
+  websiteUri?: string;
 }
 
 async function searchPlaces(textQuery: string, locationBias?: { lat: number; lng: number }) {
@@ -73,7 +75,9 @@ async function searchPlaces(textQuery: string, locationBias?: { lat: number; lng
     headers: {
       "Content-Type": "application/json",
       "X-Goog-Api-Key": GOOGLE_PLACES_API_KEY!,
-      "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.location",
+      "X-Goog-FieldMask":
+        "places.id,places.displayName,places.formattedAddress,places.location," +
+        "places.nationalPhoneNumber,places.websiteUri",
     },
     body: JSON.stringify(body),
   });
@@ -87,7 +91,14 @@ async function searchPlaces(textQuery: string, locationBias?: { lat: number; lng
   return { places: (json.places ?? []) as PlaceResult[], error: null as string | null };
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
+  // ?refresh=1 bypasses the already-processed exclusion below, for a
+  // one-time sweep to backfill phone/website onto contacts that were
+  // fetched before the field mask requested them. Normal cron/manual runs
+  // omit this and get the usual incremental "advance through the backlog"
+  // behavior.
+  const refreshMode = new URL(req.url).searchParams.get("refresh") === "1";
+
   if (!GOOGLE_PLACES_API_KEY) {
     return new Response(
       JSON.stringify({
@@ -123,6 +134,22 @@ Deno.serve(async () => {
     if (!pageRows || pageRows.length < 1000) break;
   }
 
+  // In refresh mode, "done" means at least one contact for that event
+  // already has a phone or website populated — otherwise identical to
+  // alreadyProcessed above and would never advance.
+  const alreadyRefreshed = new Set<string>();
+  if (refreshMode) {
+    for (let page = 0; ; page++) {
+      const { data: pageRows } = await supabase
+        .from("event_contacts")
+        .select("event_id")
+        .or("phone.not.is.null,website.not.is.null")
+        .range(page * 1000, page * 1000 + 999);
+      for (const row of pageRows ?? []) alreadyRefreshed.add(row.event_id as string);
+      if (!pageRows || pageRows.length < 1000) break;
+    }
+  }
+
   // estimated_damage_usd is null for most live (NWS-sourced) events, so
   // without a tiebreaker Postgres has no defined order among those ties —
   // successive calls could return them in a different order, making the
@@ -152,7 +179,7 @@ Deno.serve(async () => {
   }
 
   const events = (candidateEvents ?? [])
-    .filter((e) => !alreadyProcessed.has(e.id))
+    .filter((e) => (refreshMode ? alreadyProcessed.has(e.id) && !alreadyRefreshed.has(e.id) : !alreadyProcessed.has(e.id)))
     .slice(0, MAX_EVENTS_PER_CYCLE);
 
   let eventsProcessed = 0;
@@ -191,6 +218,8 @@ Deno.serve(async () => {
             lng: p.location?.longitude ?? null,
             google_place_id: p.id,
             target_company: target,
+            phone: p.nationalPhoneNumber ?? null,
+            website: p.websiteUri ?? null,
           }));
 
         if (rows.length > 0) {
@@ -214,11 +243,14 @@ Deno.serve(async () => {
   }
 
   const remainingBacklog = candidateEvents
-    ? candidateEvents.filter((e) => !alreadyProcessed.has(e.id)).length - eventsProcessed
+    ? candidateEvents.filter((e) =>
+        refreshMode ? alreadyProcessed.has(e.id) && !alreadyRefreshed.has(e.id) : !alreadyProcessed.has(e.id)
+      ).length - eventsProcessed
     : 0;
 
   return new Response(
     JSON.stringify({
+      mode: refreshMode ? "refresh" : "incremental",
       events_processed: eventsProcessed,
       contacts_upserted: contactsUpserted,
       remaining_backlog: Math.max(0, remainingBacklog),

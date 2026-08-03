@@ -1,8 +1,10 @@
 "use client";
 
-import type { DisasterEvent } from "@/types/event";
+import { useEffect, useState } from "react";
+import type { DisasterEvent, NewsArticle } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
+import { supabase } from "@/lib/supabase/client";
 
 export function EventDetailDrawer({
   event,
@@ -11,10 +13,28 @@ export function EventDetailDrawer({
   event: DisasterEvent | null;
   onClose: () => void;
 }) {
+  const [news, setNews] = useState<NewsArticle[]>([]);
+
+  useEffect(() => {
+    if (!event) return;
+    supabase
+      .from("news_articles")
+      .select("*")
+      .eq("event_id", event.id)
+      .order("published_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error("Failed to load news_articles", error);
+        setNews((data as NewsArticle[]) ?? []);
+      });
+  }, [event]);
+
   if (!event) return null;
 
   return (
-    <div className="glass-card absolute right-0 top-0 z-[1000] h-full w-full max-w-sm overflow-y-auto p-5 shadow-2xl">
+    <div
+      className="absolute right-0 top-0 z-[1000] h-full w-full max-w-sm overflow-y-auto border-l border-white/10 p-5 shadow-2xl"
+      style={{ background: "rgba(8, 12, 24, 0.97)", backdropFilter: "blur(12px)" }}
+    >
       <button
         onClick={onClose}
         className="mb-4 text-xs text-foreground-muted hover:text-foreground"
@@ -82,6 +102,32 @@ export function EventDetailDrawer({
           <p className="text-foreground-muted">Insurance</p>
           <p className="text-opportunity">{event.insurance_claims_score ?? "—"}</p>
         </div>
+      </div>
+
+      <div className="mt-5 border-t border-white/10 pt-4">
+        <p className="text-xs uppercase tracking-wide text-foreground-muted">Related news</p>
+        {news.length === 0 ? (
+          <p className="mt-1 text-sm text-foreground-muted">No linked articles for this event yet.</p>
+        ) : (
+          <ul className="mt-2 flex flex-col gap-2">
+            {news.map((article) => (
+              <li key={article.id}>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block text-sm text-live hover:underline"
+                >
+                  {article.headline}
+                </a>
+                <p className="text-xs text-foreground-muted">
+                  {article.source}
+                  {article.published_at ? ` · ${formatRelativeTime(article.published_at)}` : ""}
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </div>
   );
