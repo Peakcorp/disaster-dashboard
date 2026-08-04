@@ -65,10 +65,12 @@ export function PredictionsTab() {
         <p className="mt-2 text-sm text-foreground-muted">
           This is a statistical estimate built from this project&apos;s own 10-year historical archive — it
           identifies which disaster categories and states have disproportionately more activity in this same
-          3-month window in past years, and whether that activity has been trending up or down recently. It is{" "}
-          <span className="text-foreground">not</span> a prediction of a specific storm, fire, or flood at a
-          specific place or date — no free data source can do that. Treat it as a &quot;what to prepare for&quot;
-          planning signal, not a forecast to act on alone.
+          3-month window in past years, and whether that activity has been trending up or down recently. It is
+          {" "}
+          <span className="text-foreground">not</span>
+          {" "}
+          a prediction of a specific storm, fire, or flood at a specific place or date — no free data source can
+          do that. Treat it as a &quot;what to prepare for&quot; planning signal, not a forecast to act on alone.
         </p>
       </div>
 
