@@ -44,6 +44,14 @@ export function SeasonalRiskCard({ forecast }: { forecast: SeasonalRiskForecast 
               </>
             )}
           </p>
+          {forecast.topStates.length > 0 && (
+            <p className="mt-1.5 text-xs">
+              <span className="text-foreground-muted">Most active states/regions: </span>
+              <span className="text-foreground">
+                {forecast.topStates.map((s) => `${s.state} (${s.count})`).join(", ")}
+              </span>
+            </p>
+          )}
         </div>
         <span className={`shrink-0 rounded border px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ${RISK_STYLES[forecast.riskLevel]}`}>
           {RISK_LABEL[forecast.riskLevel]}
@@ -72,19 +80,6 @@ export function SeasonalRiskCard({ forecast }: { forecast: SeasonalRiskForecast 
               </p>
             </div>
           </div>
-
-          {forecast.topStates.length > 0 && (
-            <div>
-              <p className="mb-1 text-foreground-muted">Most historically active states in this window</p>
-              <ul className="flex flex-wrap gap-1">
-                {forecast.topStates.map((s) => (
-                  <li key={s.state} className="rounded bg-white/5 px-2 py-0.5 text-foreground">
-                    {s.state} ({s.count})
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
 
           {forecast.sampleEvents.length > 0 && (
             <div>

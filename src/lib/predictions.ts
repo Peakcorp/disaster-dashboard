@@ -83,16 +83,20 @@ export function computeSeasonalRiskForecasts(
     const trend = compareRollingFiveYear(yearlyTrend);
     const trendDirection = trend?.direction ?? "unknown";
 
+    // Counts every state an event lists, not just the first — many
+    // historical entries name a whole region ("Midwest/Plains/Southeast
+    // Tornadoes"), and undercounting to one state per event would bury
+    // real multi-state footprints.
     const stateCounts = new Map<string, number>();
     for (const event of windowEvents) {
-      const state = event.states_affected[0];
-      if (!state) continue;
-      stateCounts.set(state, (stateCounts.get(state) ?? 0) + 1);
+      for (const state of event.states_affected) {
+        stateCounts.set(state, (stateCounts.get(state) ?? 0) + 1);
+      }
     }
     const topStates = Array.from(stateCounts.entries())
       .map(([state, count]) => ({ state, count }))
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5);
+      .slice(0, 8);
 
     let riskLevel: RiskLevel;
     if (totalEventsLast10Yr < MIN_EVENTS_FOR_CONFIDENCE) {

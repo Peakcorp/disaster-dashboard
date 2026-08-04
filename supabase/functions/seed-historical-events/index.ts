@@ -24,7 +24,59 @@
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import Papa from "npm:papaparse@5";
-import { MATERIALS_BY_DISASTER_TYPE } from "../_shared/constants.ts";
+import { MATERIALS_BY_DISASTER_TYPE, STATE_CODE_TO_NAME } from "../_shared/constants.ts";
+
+// NOAA's Billion-Dollar Disasters CSV has no state/region column at all —
+// just Name, Disaster, Begin Date, End Date, and cost/death figures. The
+// only geographic signal is free text baked into the event name (e.g.
+// "Arizona Flooding (October 1983)", "Gulf States Storms and Flooding
+// (December 1982-January 1983)", "Midwest/Plains/Southeast Tornadoes").
+// Extracting states from that text is the only way this dataset can support
+// a region-level view (Tab 6's Predictions), so this matches full state
+// names directly, plus a synonym map for the common multi-state region
+// names NOAA uses instead of listing states out.
+const NAME_TO_CODE: Record<string, string> = Object.fromEntries(
+  Object.entries(STATE_CODE_TO_NAME).map(([code, name]) => [name.toLowerCase(), code])
+);
+
+const REGION_SYNONYMS: Record<string, string[]> = {
+  "gulf states": ["TX", "LA", "MS", "AL", "FL"],
+  "gulf coast": ["TX", "LA", "MS", "AL", "FL"],
+  midwest: ["OH", "IN", "IL", "MI", "WI", "MN", "IA", "MO", "ND", "SD", "NE", "KS"],
+  northeast: ["ME", "NH", "VT", "MA", "RI", "CT", "NY", "NJ", "PA"],
+  "new england": ["ME", "NH", "VT", "MA", "RI", "CT"],
+  southeast: ["VA", "NC", "SC", "GA", "FL", "AL", "MS", "TN", "KY"],
+  southwest: ["AZ", "NM", "TX", "NV"],
+  "pacific northwest": ["WA", "OR", "ID"],
+  plains: ["ND", "SD", "NE", "KS", "OK", "TX"],
+  "northern plains": ["ND", "SD", "MT", "WY"],
+  "west coast": ["CA", "OR", "WA"],
+  western: ["CA", "OR", "WA", "NV", "AZ", "ID", "MT", "WY", "UT", "CO", "NM"],
+  southern: ["TX", "LA", "MS", "AL", "GA", "FL", "SC", "NC", "TN", "AR"],
+  rockies: ["CO", "WY", "MT", "ID", "UT"],
+  "rocky mountain": ["CO", "WY", "MT", "ID", "UT"],
+};
+
+function extractStatesFromName(name: string): string[] {
+  const lower = name.toLowerCase();
+  const found = new Set<string>();
+
+  for (const [stateName, code] of Object.entries(NAME_TO_CODE)) {
+    // Word-boundary match so "Georgia" doesn't match inside an unrelated
+    // word, and so short names aren't over-eager — still fine for full
+    // state names like "ohio" or "texas".
+    const pattern = new RegExp(`\\b${stateName}\\b`, "i");
+    if (pattern.test(lower)) found.add(code);
+  }
+
+  for (const [term, codes] of Object.entries(REGION_SYNONYMS)) {
+    if (lower.includes(term)) {
+      for (const code of codes) found.add(code);
+    }
+  }
+
+  return Array.from(found);
+}
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -140,6 +192,7 @@ Deno.serve(async () => {
   let inserted = 0;
   let skipped = 0;
   let failed = 0;
+  let withStatesExtracted = 0;
 
   for (const [index, row] of parsed.data.entries()) {
     const name = row[nameCol]?.trim();
@@ -165,6 +218,8 @@ Deno.serve(async () => {
       continue;
     }
     const externalId = `${slugify(name)}-${beginDate.getUTCFullYear()}-${index}`;
+    const statesAffected = extractStatesFromName(name);
+    if (statesAffected.length > 0) withStatesExtracted++;
 
     const eventRow = {
       name,
@@ -173,7 +228,7 @@ Deno.serve(async () => {
       status: "resolved" as const,
       start_date: beginDate.toISOString().slice(0, 10),
       end_date: endDate ? endDate.toISOString().slice(0, 10) : null,
-      states_affected: [] as string[],
+      states_affected: statesAffected,
       counties: [] as string[],
       estimated_damage_usd: costCol ? parseMoneyInMillions(row[costCol]) : null,
       fatalities: deathsCol ? Number(row[deathsCol]) || null : null,
@@ -234,6 +289,7 @@ Deno.serve(async () => {
     rows_in_csv: parsed.data.length,
     seeded: inserted,
     skipped_missing_fields: skipped,
+    with_states_extracted_from_name: withStatesExtracted,
     failed,
     completed_at: new Date().toISOString(),
   };
