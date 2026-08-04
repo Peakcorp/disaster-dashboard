@@ -57,6 +57,50 @@ const REGION_SYNONYMS: Record<string, string[]> = {
   "rocky mountain": ["CO", "WY", "MT", "ID", "UT"],
 };
 
+// NOAA names hurricanes/tropical storms by their proper name only
+// ("Hurricane Harvey (August 2017)"), never the state — extractStatesFromName
+// finds nothing for essentially every hurricane entry, which guts the one
+// category most people would actually want a region breakdown for. These are
+// the primary US landfall state(s) for every named storm in the last ~10
+// years of this dataset — well-documented public record, not a guess, so a
+// small curated map is safe here (unlike guessing at unnamed/regional events).
+const KNOWN_STORM_STATES: Record<string, string[]> = {
+  matthew: ["FL", "GA", "SC", "NC"],
+  harvey: ["TX"],
+  irma: ["FL"],
+  maria: ["PR"],
+  florence: ["NC", "SC"],
+  michael: ["FL"],
+  dorian: ["NC"],
+  imelda: ["TX"],
+  hanna: ["TX"],
+  isaias: ["NC", "FL"],
+  laura: ["LA"],
+  sally: ["AL", "FL"],
+  delta: ["LA"],
+  zeta: ["LA"],
+  eta: ["FL"],
+  elsa: ["FL"],
+  fred: ["FL", "AL"],
+  ida: ["LA"],
+  nicholas: ["TX"],
+  fiona: ["PR"],
+  ian: ["FL"],
+  nicole: ["FL"],
+  idalia: ["FL"],
+  beryl: ["TX"],
+  debby: ["FL"],
+  francine: ["LA"],
+  helene: ["FL", "GA", "NC", "SC", "TN"],
+  milton: ["FL"],
+};
+
+function extractHurricaneStates(name: string): string[] {
+  const match = name.match(/(?:hurricane|tropical storm|typhoon)\s+([a-z]+)/i);
+  if (!match) return [];
+  return KNOWN_STORM_STATES[match[1].toLowerCase()] ?? [];
+}
+
 function extractStatesFromName(name: string): string[] {
   const lower = name.toLowerCase();
   const found = new Set<string>();
@@ -218,7 +262,9 @@ Deno.serve(async () => {
       continue;
     }
     const externalId = `${slugify(name)}-${beginDate.getUTCFullYear()}-${index}`;
-    const statesAffected = extractStatesFromName(name);
+    const nameMatches = extractStatesFromName(name);
+    const statesAffected =
+      nameMatches.length > 0 ? nameMatches : category === "hurricane" ? extractHurricaneStates(name) : [];
     if (statesAffected.length > 0) withStatesExtracted++;
 
     const eventRow = {
