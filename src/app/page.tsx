@@ -11,6 +11,7 @@ import { HistoricalTab } from "@/components/tabs/HistoricalTab";
 import { SupplyXTab } from "@/components/tabs/SupplyXTab";
 import { InterservTab } from "@/components/tabs/InterservTab";
 import { InsuranceClaimsTab } from "@/components/tabs/InsuranceClaimsTab";
+import { PredictionsTab } from "@/components/tabs/PredictionsTab";
 import { ComingSoonTab } from "@/components/tabs/ComingSoonTab";
 
 export default function DashboardPage() {
@@ -86,6 +87,8 @@ export default function DashboardPage() {
           <InterservTab events={events} />
         ) : activeTab === "insurance" ? (
           <InsuranceClaimsTab events={events} />
+        ) : activeTab === "predictions" ? (
+          <PredictionsTab />
         ) : (
           <div className="flex flex-1 p-6">
             <ComingSoonTab tab={activeTabDef} />

@@ -1,4 +1,4 @@
-export type TabId = "live-map" | "historical" | "supplyx" | "interserv" | "insurance";
+export type TabId = "live-map" | "historical" | "supplyx" | "interserv" | "insurance" | "predictions";
 
 export interface TabDef {
   id: TabId;
@@ -13,4 +13,5 @@ export const TABS: TabDef[] = [
   { id: "supplyx", label: "SupplyX Intelligence", shortLabel: "SupplyX", built: true },
   { id: "interserv", label: "Interserv LP Intelligence", shortLabel: "Interserv", built: true },
   { id: "insurance", label: "Insurance Claims Intelligence", shortLabel: "Insurance Claims", built: true },
+  { id: "predictions", label: "Seasonal Risk Predictions", shortLabel: "Predictions", built: true },
 ];
