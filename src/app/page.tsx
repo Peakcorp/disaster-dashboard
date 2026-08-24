@@ -13,6 +13,7 @@ import { InterservTab } from "@/components/tabs/InterservTab";
 import { InsuranceClaimsTab } from "@/components/tabs/InsuranceClaimsTab";
 import { PredictionsTab } from "@/components/tabs/PredictionsTab";
 import { ComingSoonTab } from "@/components/tabs/ComingSoonTab";
+import { fetchAllPages } from "@/lib/supabaseFetch";
 
 export default function DashboardPage() {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
@@ -24,17 +25,22 @@ export default function DashboardPage() {
 
     // Tab 1 (live map) shows only the live-tracked feed, not historical
     // seed rows from Tab 2 — those are fetched separately by HistoricalTab.
-    supabase
-      .from("events")
-      .select("*")
-      .eq("is_historical_seed", false)
-      .order("start_date", { ascending: false })
-      .then(({ data, error }) => {
-        if (!isMounted) return;
-        if (error) console.error("Failed to load events", error);
-        setEvents((data as DisasterEvent[]) ?? []);
-        setLoading(false);
-      });
+    // Paginated because the live feed has grown past PostgREST's 1000-row
+    // response cap, which was silently truncating this to a fixed 1000
+    // rows regardless of how many active events actually exist.
+    fetchAllPages<DisasterEvent>((from, to) =>
+      supabase
+        .from("events")
+        .select("*")
+        .eq("is_historical_seed", false)
+        .order("start_date", { ascending: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => {
+      if (!isMounted) return;
+      setEvents(data);
+      setLoading(false);
+    });
 
     const channel = supabase
       .channel("events-realtime")

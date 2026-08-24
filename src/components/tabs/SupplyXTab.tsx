@@ -9,6 +9,7 @@ import { MaterialDemandPanel } from "@/components/supplyx/MaterialDemandPanel";
 import { MaterialsNeededList } from "@/components/supplyx/MaterialsNeededList";
 import { MaterialPriceReference } from "@/components/supplyx/MaterialPriceReference";
 import { ContactsList } from "@/components/company/ContactsList";
+import { fetchByIdsChunked } from "@/lib/supabaseFetch";
 
 type DemandSort = "severity" | "recent" | "state_az";
 const DEMAND_SORT_LABELS: Record<DemandSort, string> = {
@@ -49,23 +50,15 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
     // stale materials/contacts in state simply won't be rendered against
     // anything — no need to synchronously clear state here.
     if (eventIds.length === 0) return;
-    supabase
-      .from("event_materials")
-      .select("*")
-      .in("event_id", eventIds)
-      .then(({ data, error }) => {
-        if (error) console.error("Failed to load event_materials", error);
-        setMaterials((data as EventMaterial[]) ?? []);
-      });
-    supabase
-      .from("event_contacts")
-      .select("*")
-      .in("event_id", eventIds)
-      .in("target_company", ["supplyx", "all"])
-      .then(({ data, error }) => {
-        if (error) console.error("Failed to load event_contacts", error);
-        setContacts((data as EventContact[]) ?? []);
-      });
+    fetchByIdsChunked<EventMaterial>(
+      (chunk) => supabase.from("event_materials").select("*").in("event_id", chunk),
+      eventIds
+    ).then(setMaterials);
+    fetchByIdsChunked<EventContact>(
+      (chunk) =>
+        supabase.from("event_contacts").select("*").in("event_id", chunk).in("target_company", ["supplyx", "all"]),
+      eventIds
+    ).then(setContacts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIds.join(",")]);
 

@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import type { DisasterEvent } from "@/types/event";
 import { computeSeasonalRiskForecasts } from "@/lib/predictions";
 import { SeasonalRiskCard } from "@/components/predictions/SeasonalRiskCard";
+import { fetchAllPages } from "@/lib/supabaseFetch";
 
 export function PredictionsTab() {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
@@ -12,16 +13,18 @@ export function PredictionsTab() {
 
   useEffect(() => {
     let isMounted = true;
-    supabase
-      .from("events")
-      .select("*")
-      .eq("is_historical_seed", true)
-      .then(({ data, error }) => {
-        if (!isMounted) return;
-        if (error) console.error("Failed to load historical events", error);
-        setEvents((data as DisasterEvent[]) ?? []);
-        setLoading(false);
-      });
+    fetchAllPages<DisasterEvent>((from, to) =>
+      supabase
+        .from("events")
+        .select("*")
+        .eq("is_historical_seed", true)
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => {
+      if (!isMounted) return;
+      setEvents(data);
+      setLoading(false);
+    });
     return () => {
       isMounted = false;
     };

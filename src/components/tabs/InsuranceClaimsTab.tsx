@@ -8,6 +8,7 @@ import { ClaimCategoryList } from "@/components/insurance/ClaimCategoryCard";
 import { ReferralPartnersPanel } from "@/components/insurance/ReferralPartnersPanel";
 import { StateRegulatoryPanel } from "@/components/insurance/StateRegulatoryPanel";
 import { sortBySeverity } from "@/lib/format";
+import { fetchByIdsChunked } from "@/lib/supabaseFetch";
 
 export function InsuranceClaimsTab({ events }: { events: DisasterEvent[] }) {
   const [partners, setPartners] = useState<ReferralPartner[]>([]);
@@ -45,20 +46,20 @@ export function InsuranceClaimsTab({ events }: { events: DisasterEvent[] }) {
 
   useEffect(() => {
     if (eventIds.length === 0) return;
-    supabase
-      .from("news_articles")
-      .select("*")
-      .in("event_id", eventIds)
-      .order("published_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) console.error("Failed to load news_articles", error);
-        const byEvent: Record<string, NewsArticle[]> = {};
-        for (const article of (data as NewsArticle[]) ?? []) {
-          if (!article.event_id) continue;
-          (byEvent[article.event_id] ??= []).push(article);
-        }
-        setNewsByEventId(byEvent);
-      });
+    fetchByIdsChunked<NewsArticle>(
+      (chunk) => supabase.from("news_articles").select("*").in("event_id", chunk),
+      eventIds
+    ).then((articles) => {
+      const byEvent: Record<string, NewsArticle[]> = {};
+      for (const article of articles) {
+        if (!article.event_id) continue;
+        (byEvent[article.event_id] ??= []).push(article);
+      }
+      for (const list of Object.values(byEvent)) {
+        list.sort((a, b) => (b.published_at ?? "").localeCompare(a.published_at ?? ""));
+      }
+      setNewsByEventId(byEvent);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIds.join(",")]);
 

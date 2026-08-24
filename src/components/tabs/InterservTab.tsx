@@ -9,6 +9,7 @@ import { OutreachWindowCard } from "@/components/interserv/OutreachWindowCard";
 import { SeasonalFocusPanel } from "@/components/interserv/SeasonalFocusPanel";
 import { ContactsList } from "@/components/company/ContactsList";
 import { outreachStatusFor } from "@/lib/company";
+import { fetchByIdsChunked } from "@/lib/supabaseFetch";
 
 const PROPERTY_TYPES: { value: ContactCompanyType | "all"; label: string }[] = [
   { value: "all", label: "All property types" },
@@ -74,15 +75,11 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
     // No active qualifying events means nothing renders against contacts
     // anyway — no need to synchronously clear state here.
     if (eventIds.length === 0) return;
-    supabase
-      .from("event_contacts")
-      .select("*")
-      .in("event_id", eventIds)
-      .in("target_company", ["interserv", "all"])
-      .then(({ data, error }) => {
-        if (error) console.error("Failed to load event_contacts", error);
-        setContacts((data as EventContact[]) ?? []);
-      });
+    fetchByIdsChunked<EventContact>(
+      (chunk) =>
+        supabase.from("event_contacts").select("*").in("event_id", chunk).in("target_company", ["interserv", "all"]),
+      eventIds
+    ).then(setContacts);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [eventIds.join(",")]);
 

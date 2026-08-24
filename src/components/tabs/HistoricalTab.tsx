@@ -8,6 +8,7 @@ import { PredictiveCalendarHeatmap } from "@/components/historical/PredictiveCal
 import { SeasonalDangerAlerts } from "@/components/historical/SeasonalDangerAlerts";
 import { TrendLineChart } from "@/components/historical/TrendLineChart";
 import { HistoricalEventCard } from "@/components/historical/HistoricalEventCard";
+import { fetchAllPages } from "@/lib/supabaseFetch";
 
 type SortOption =
   | "damage_desc"
@@ -57,17 +58,21 @@ export function HistoricalTab() {
 
   useEffect(() => {
     let isMounted = true;
-    supabase
-      .from("events")
-      .select("*")
-      .eq("is_historical_seed", true)
-      .order("estimated_damage_usd", { ascending: false })
-      .then(({ data, error }) => {
-        if (!isMounted) return;
-        if (error) console.error("Failed to load historical events", error);
-        setEvents((data as DisasterEvent[]) ?? []);
-        setLoading(false);
-      });
+    // Paginated so this keeps working once the archive grows past
+    // PostgREST's 1000-row response cap (see supabaseFetch.ts).
+    fetchAllPages<DisasterEvent>((from, to) =>
+      supabase
+        .from("events")
+        .select("*")
+        .eq("is_historical_seed", true)
+        .order("estimated_damage_usd", { ascending: false, nullsFirst: false })
+        .order("id", { ascending: true })
+        .range(from, to)
+    ).then((data) => {
+      if (!isMounted) return;
+      setEvents(data);
+      setLoading(false);
+    });
     return () => {
       isMounted = false;
     };
