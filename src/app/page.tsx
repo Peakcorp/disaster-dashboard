@@ -12,6 +12,9 @@ import { SupplyXTab } from "@/components/tabs/SupplyXTab";
 import { InterservTab } from "@/components/tabs/InterservTab";
 import { InsuranceClaimsTab } from "@/components/tabs/InsuranceClaimsTab";
 import { PredictionsTab } from "@/components/tabs/PredictionsTab";
+import { Section1031Tab } from "@/components/tabs/Section1031Tab";
+import { ReceivershipTab } from "@/components/tabs/ReceivershipTab";
+import { ChatTab } from "@/components/tabs/ChatTab";
 import { ComingSoonTab } from "@/components/tabs/ComingSoonTab";
 import { fetchAllPages } from "@/lib/supabaseFetch";
 
@@ -95,6 +98,12 @@ export default function DashboardPage() {
           <InsuranceClaimsTab events={events} />
         ) : activeTab === "predictions" ? (
           <PredictionsTab />
+        ) : activeTab === "section1031" ? (
+          <Section1031Tab />
+        ) : activeTab === "receivership" ? (
+          <ReceivershipTab />
+        ) : activeTab === "chat" ? (
+          <ChatTab />
         ) : (
           <div className="flex flex-1 p-6">
             <ComingSoonTab tab={activeTabDef} />

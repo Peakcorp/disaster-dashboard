@@ -57,3 +57,42 @@ export async function callClaudeJson(
     outputTokens: json.usage?.output_tokens ?? 0,
   };
 }
+
+// Same raw-fetch pattern as callClaudeJson, for freeform text answers
+// (the chat feature) where forcing a JSON schema would just add overhead.
+export async function callClaudeText(
+  apiKey: string,
+  systemPrompt: string,
+  userPrompt: string,
+  maxTokens: number
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: AI_MODEL,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      messages: [{ role: "user", content: userPrompt }],
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Claude API error ${res.status}: ${text}`);
+  }
+
+  const json = await res.json();
+  const textBlock = (json.content ?? []).find((b: { type: string }) => b.type === "text");
+  if (!textBlock) throw new Error("No text block in Claude response");
+
+  return {
+    text: textBlock.text,
+    inputTokens: json.usage?.input_tokens ?? 0,
+    outputTokens: json.usage?.output_tokens ?? 0,
+  };
+}

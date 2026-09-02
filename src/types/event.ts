@@ -35,6 +35,8 @@ export interface DisasterEvent {
   govt_support_level: GovtSupportLevel;
   fatalities: number | null;
   confidence_score: ConfidenceScore;
+  external_source: string;
+  external_id: string;
   source_data_hash: string | null;
   last_fetched_at: string | null;
   supplyx_score: number | null;

@@ -66,3 +66,19 @@ export interface StateRegulatoryInfo {
   statute_of_limitations_note: string | null;
   doi_contact: string | null;
 }
+
+export type ReceivershipStatus = "reported" | "confirmed" | "resolved";
+
+export interface PropertyReceivership {
+  id: string;
+  property_name: string;
+  address: string | null;
+  state: string | null;
+  event_contact_id: string | null;
+  related_event_id: string | null;
+  receivership_status: ReceivershipStatus;
+  filed_date: string | null;
+  news_url: string | null;
+  notes: string | null;
+  created_at: string;
+}
