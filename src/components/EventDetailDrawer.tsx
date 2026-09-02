@@ -5,6 +5,7 @@ import type { DisasterEvent, NewsArticle } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
 import { supabase } from "@/lib/supabase/client";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 export function EventDetailDrawer({
   event,
@@ -46,7 +47,10 @@ export function EventDetailDrawer({
         Close ✕
       </button>
 
-      <h2 className="text-lg font-semibold text-foreground">{event.name}</h2>
+      <div className="flex items-start justify-between gap-2">
+        <h2 className="text-lg font-semibold text-foreground">{event.name}</h2>
+        <OccurrenceBadge event={event} />
+      </div>
       <p className="mt-1 text-sm text-foreground-muted">
         {CATEGORY_LABELS[event.category]} · {event.sub_type ?? "—"}
       </p>

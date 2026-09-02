@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DisasterEvent, NewsArticle } from "@/types/event";
 import { formatUsd, formatRelativeTime } from "@/lib/format";
 import { CLAIM_TYPES_BY_CATEGORY, stateLawFavorability, estimateClaimValuePoolUsd } from "@/lib/company";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 const FAVORABILITY_LABEL: Record<"high" | "medium", string> = {
   high: "Strong policyholder protection laws",
@@ -29,9 +30,12 @@ export function ClaimPoolCard({ event, newsArticles = [] }: { event: DisasterEve
     >
       <div className="flex items-start justify-between gap-2">
         <p className="text-foreground">{event.name}</p>
-        <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase text-foreground-muted">
-          {event.confidence_score} confidence
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className="rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase text-foreground-muted">
+            {event.confidence_score} confidence
+          </span>
+          <OccurrenceBadge event={event} />
+        </div>
       </div>
 
       <div className="mt-2 grid grid-cols-2 gap-2 text-xs">

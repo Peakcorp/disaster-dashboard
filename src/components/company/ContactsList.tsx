@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { EventContact, ContactCompanyType, ContactStatus } from "@/types/company";
+import type { DisasterEvent } from "@/types/event";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 const TYPE_LABELS: Record<ContactCompanyType, string> = {
   church: "Church",
@@ -25,12 +27,28 @@ const STATUS_STYLES: Record<ContactStatus, string> = {
   closed: "bg-opportunity/15 text-opportunity",
 };
 
+function mapsLink(contact: EventContact): string {
+  const query = encodeURIComponent(`${contact.name} ${contact.address ?? ""}`.trim());
+  const placeId = contact.google_place_id ? `&query_place_id=${contact.google_place_id}` : "";
+  return `https://www.google.com/maps/search/?api=1&query=${query}${placeId}`;
+}
+
+function loopnetSearchLink(contact: EventContact): string {
+  const query = encodeURIComponent(`${contact.name} ${contact.address ?? ""} site:loopnet.com`.trim());
+  return `https://www.google.com/search?q=${query}`;
+}
+
 export function ContactsList({
   contacts,
   emptyMessage,
+  eventsById,
 }: {
   contacts: EventContact[];
   emptyMessage: string;
+  // Optional: when provided, shows each property's parent event's
+  // occurring/watch status — a property tied to a Watch hasn't necessarily
+  // been hit yet, vs. one tied to a Warning/confirmed event.
+  eventsById?: Record<string, DisasterEvent>;
 }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [statusOverrides, setStatusOverrides] = useState<Record<string, ContactStatus>>({});
@@ -73,19 +91,22 @@ export function ContactsList({
                 <p className="text-xs text-foreground-muted">{TYPE_LABELS[contact.company_type]}</p>
                 {contact.address && <p className="mt-0.5 text-xs text-foreground-muted">{contact.address}</p>}
               </div>
-              <select
-                value={status}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => updateStatus(contact, e.target.value as ContactStatus)}
-                title="Referral status"
-                className={`shrink-0 rounded border-none px-1.5 py-0.5 text-[10px] uppercase transition hover:brightness-125 ${STATUS_STYLES[status]}`}
-              >
-                {STATUS_OPTIONS.map((option) => (
-                  <option key={option} value={option} className="bg-background text-foreground normal-case">
-                    {option.replace("_", " ")}
-                  </option>
-                ))}
-              </select>
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <select
+                  value={status}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => updateStatus(contact, e.target.value as ContactStatus)}
+                  title="Referral status"
+                  className={`rounded border-none px-1.5 py-0.5 text-[10px] uppercase transition hover:brightness-125 ${STATUS_STYLES[status]}`}
+                >
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option} value={option} className="bg-background text-foreground normal-case">
+                      {option.replace("_", " ")}
+                    </option>
+                  ))}
+                </select>
+                {eventsById?.[contact.event_id] && <OccurrenceBadge event={eventsById[contact.event_id]} />}
+              </div>
             </div>
 
             <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-foreground-muted">
@@ -105,6 +126,24 @@ export function ContactsList({
                   Website
                 </a>
               )}
+              <a
+                href={mapsLink(contact)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-live hover:underline"
+              >
+                View on Map
+              </a>
+              <a
+                href={loopnetSearchLink(contact)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-live hover:underline"
+              >
+                Search LoopNet
+              </a>
               {!contact.phone && !contact.website && <span>No phone/website on file</span>}
             </div>
 
@@ -116,6 +155,7 @@ export function ContactsList({
 
             {expanded && (
               <div className="mt-2 border-t border-white/10 pt-2 text-xs text-foreground-muted">
+                <p>Type: {TYPE_LABELS[contact.company_type]}</p>
                 <p>State: {contact.state ?? "—"}</p>
                 <p>City: {contact.city ?? "—"}</p>
                 {contact.lat != null && contact.lng != null && (
@@ -123,6 +163,10 @@ export function ContactsList({
                     Coordinates: {contact.lat.toFixed(4)}, {contact.lng.toFixed(4)}
                   </p>
                 )}
+                <p className="mt-1 italic">
+                  Square footage/lot size isn&apos;t available from Google Places — use the Map or LoopNet links
+                  above to look up listing details.
+                </p>
                 {contact.notes && <p>Notes: {contact.notes}</p>}
               </div>
             )}

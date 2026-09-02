@@ -2,6 +2,7 @@
 
 import type { DisasterEvent, EventMaterial } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 export function MaterialDemandPanel({
   event,
@@ -15,7 +16,10 @@ export function MaterialDemandPanel({
 
   return (
     <div className="glass-card rounded-lg p-3">
-      <p className="text-sm font-medium text-foreground">{event.name}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-sm font-medium text-foreground">{event.name}</p>
+        <OccurrenceBadge event={event} />
+      </div>
       <p className="mb-2 text-xs text-foreground-muted">{CATEGORY_LABELS[event.category]}</p>
 
       {destroyed.length === 0 && consumed.length === 0 ? (

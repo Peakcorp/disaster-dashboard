@@ -8,6 +8,7 @@ import type { EventContact, ContactStatus } from "@/types/company";
 import { MaterialDemandPanel } from "@/components/supplyx/MaterialDemandPanel";
 import { MaterialsNeededList } from "@/components/supplyx/MaterialsNeededList";
 import { MaterialPriceReference } from "@/components/supplyx/MaterialPriceReference";
+import { RegulatoryInfoPanel } from "@/components/supplyx/RegulatoryInfoPanel";
 import { ContactsList } from "@/components/company/ContactsList";
 import { fetchByIdsChunked } from "@/lib/supabaseFetch";
 
@@ -91,6 +92,8 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
     }
   }, [filteredEvents, demandSort]);
 
+  const eventsById = useMemo(() => Object.fromEntries(activeEvents.map((e) => [e.id, e])), [activeEvents]);
+
   const churches = contacts.filter((c) => c.company_type === "church");
   const targetClients = contacts.filter((c) =>
     ["contractor", "restoration_company", "property_management"].includes(c.company_type)
@@ -146,6 +149,13 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
       </div>
 
       <div className="glass-card rounded-lg p-4">
+        <p className="mb-3 text-xs uppercase tracking-wide text-foreground-muted">
+          Price Gouging Restrictions &amp; Approved Materials by Region
+        </p>
+        <RegulatoryInfoPanel events={filteredEvents} />
+      </div>
+
+      <div className="glass-card rounded-lg p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">
             Material Demand Forecasting — Destroyed vs. Consumed
@@ -195,6 +205,7 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
           </div>
           <ContactsList
             contacts={filterContacts(churches)}
+            eventsById={eventsById}
             emptyMessage="No churches surfaced yet — run the fetch-places edge function (needs GOOGLE_PLACES_API_KEY)."
           />
         </div>
@@ -215,6 +226,7 @@ export function SupplyXTab({ events }: { events: DisasterEvent[] }) {
           </div>
           <ContactsList
             contacts={filterContacts(targetClients)}
+            eventsById={eventsById}
             emptyMessage="No contractors/restoration/property management firms surfaced yet — run fetch-places."
           />
         </div>

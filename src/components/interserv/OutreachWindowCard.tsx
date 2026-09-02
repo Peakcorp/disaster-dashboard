@@ -6,6 +6,7 @@ import { CATEGORY_LABELS } from "@/types/event";
 import type { EventContact } from "@/types/company";
 import { outreachStatusFor, outreachTimingFor, OUTREACH_STATUS_LABEL, daysSince } from "@/lib/company";
 import { formatUsd } from "@/lib/format";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 const CONTACT_TYPE_LABELS: Record<string, string> = {
   church: "Church",
@@ -39,9 +40,12 @@ export function OutreachWindowCard({ event, contacts }: { event: DisasterEvent; 
             {formatUsd(event.estimated_damage_usd)}
           </p>
         </div>
-        <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
-          {OUTREACH_STATUS_LABEL[status]}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLES[status]}`}>
+            {OUTREACH_STATUS_LABEL[status]}
+          </span>
+          <OccurrenceBadge event={event} />
+        </div>
       </div>
       <p className="mt-1 text-xs text-foreground-muted">
         Typical outreach window for this disaster type: {timing.minMonths}–{timing.maxMonths} months

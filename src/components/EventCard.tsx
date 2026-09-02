@@ -3,6 +3,7 @@
 import type { DisasterEvent } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
 import { formatRelativeTime, formatUsd } from "@/lib/format";
+import { OccurrenceBadge } from "@/components/OccurrenceBadge";
 
 const STATUS_STYLES: Record<DisasterEvent["status"], string> = {
   critical: "bg-critical/20 text-critical border-critical/40",
@@ -40,11 +41,14 @@ export function EventCard({
             {CATEGORY_LABELS[event.category]} · {event.states_affected.join(", ") || "Unknown"}
           </p>
         </div>
-        <span
-          className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${STATUS_STYLES[event.status]}`}
-        >
-          {event.status}
-        </span>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span
+            className={`rounded border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${STATUS_STYLES[event.status]}`}
+          >
+            {event.status}
+          </span>
+          <OccurrenceBadge event={event} />
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-foreground-muted">

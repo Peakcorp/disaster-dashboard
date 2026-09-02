@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { DisasterEvent, DisasterCategory, EventMaterial } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
+import { computeShortageRiskMap, topShortageRiskMaterials } from "@/lib/shortageRisk";
 
 type SortOption = "event_count" | "category_az" | "item_count";
 const SORT_LABELS: Record<SortOption, string> = {
@@ -64,11 +65,16 @@ export function MaterialsNeededList({
   materials,
 }: {
   events: DisasterEvent[];
+  // The caller passes the full, unfiltered national active-event material
+  // set here (not narrowed by whatever category/state the user filtered
+  // the page to) — a shortage is a supply-chain phenomenon, so the risk
+  // scoring below deliberately looks at all of it regardless of `events`.
   materials: EventMaterial[];
 }) {
   const [expanded, setExpanded] = useState<DisasterCategory | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("event_count");
   const groups = useMemo(() => sortGroups(buildGroups(events, materials), sortBy), [events, materials, sortBy]);
+  const shortageRiskMap = useMemo(() => computeShortageRiskMap(materials), [materials]);
 
   if (groups.length === 0) {
     return (
@@ -98,6 +104,9 @@ export function MaterialsNeededList({
           group.states.length > 4
             ? `${group.states.slice(0, 4).join(", ")} +${group.states.length - 4} more`
             : group.states.join(", ") || "Multi-state";
+        const allItems = [...group.destroyed, ...group.consumed];
+        const shortageItems = topShortageRiskMaterials(allItems, shortageRiskMap, 4);
+        const shortageNames = new Set(shortageItems.map((s) => s.materialName));
 
         return (
           <li key={group.category} className="glass-card rounded-md p-3 text-sm">
@@ -117,40 +126,77 @@ export function MaterialsNeededList({
             </button>
 
             {isOpen && (
-              <div className="mt-2 flex flex-col gap-2 border-t border-white/10 pt-2 text-xs">
-                {group.destroyed.length > 0 && (
+              <div className="mt-2 flex flex-col gap-3 border-t border-white/10 pt-2 text-xs">
+                {shortageItems.length > 0 && (
                   <div>
-                    <p className="mb-1 text-critical">Destroyed — likely to sell immediately post-impact:</p>
+                    <p className="mb-1 text-warning">
+                      ⚠ Shortage risk — high concurrent nationwide demand{" "}
+                      {shortageItems.some((s) => s.historicallyShortageProne) && "+ historical shortage precedent"}:
+                    </p>
                     <ul className="flex flex-wrap gap-1">
-                      {group.destroyed.map((name) => (
-                        <li key={name} className="rounded bg-critical/10 px-2 py-0.5 text-foreground">
-                          {name}
+                      {shortageItems.map((s) => (
+                        <li
+                          key={s.materialName}
+                          title={`Needed by ${s.concurrentDemandCount} active event(s) nationwide right now${s.historicallyShortageProne ? " — historically shortage-prone item" : ""}`}
+                          className="rounded bg-warning/15 px-2 py-0.5 text-foreground"
+                        >
+                          {s.materialName}
+                          {s.historicallyShortageProne && " ★"}
                         </li>
                       ))}
                     </ul>
                   </div>
                 )}
-                {group.consumed.length > 0 && (
-                  <div>
-                    <p className="mb-1 text-ai">Consumed — post-recovery demand (3-12 months out):</p>
-                    <ul className="flex flex-wrap gap-1">
-                      {group.consumed.map((name) => (
-                        <li key={name} className="rounded bg-ai/10 px-2 py-0.5 text-foreground">
-                          {name}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                {group.destroyed.length === 0 && group.consumed.length === 0 && (
-                  <p className="text-foreground-muted">No material classification yet for this category.</p>
-                )}
+
+                <div>
+                  <p className="mb-1 text-foreground-muted">
+                    General materials affected/likely affected (full list):
+                  </p>
+                  {group.destroyed.length > 0 && (
+                    <div className="mb-1.5">
+                      <p className="mb-1 text-critical">Destroyed — likely to sell immediately post-impact:</p>
+                      <ul className="flex flex-wrap gap-1">
+                        {group.destroyed.map((name) => (
+                          <li
+                            key={name}
+                            className={`rounded px-2 py-0.5 text-foreground ${shortageNames.has(name) ? "bg-warning/10" : "bg-critical/10"}`}
+                          >
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {group.consumed.length > 0 && (
+                    <div>
+                      <p className="mb-1 text-ai">Consumed — post-recovery demand (3-12 months out):</p>
+                      <ul className="flex flex-wrap gap-1">
+                        {group.consumed.map((name) => (
+                          <li
+                            key={name}
+                            className={`rounded px-2 py-0.5 text-foreground ${shortageNames.has(name) ? "bg-warning/10" : "bg-ai/10"}`}
+                          >
+                            {name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {group.destroyed.length === 0 && group.consumed.length === 0 && (
+                    <p className="text-foreground-muted">No material classification yet for this category.</p>
+                  )}
+                </div>
               </div>
             )}
           </li>
         );
       })}
       </ul>
+      <p className="text-[10px] text-foreground-muted">
+        ★ Shortage risk combines how many active events nationwide need the same material right now with a
+        curated list of materials with documented historical shortage precedent (lumber, drywall, roofing,
+        impact windows, generators/tarps, copper pipe) — a signal to watch, not a guarantee.
+      </p>
     </div>
   );
 }

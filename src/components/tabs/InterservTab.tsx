@@ -107,6 +107,11 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
     }
   }, [qualifyingEvents, categoryFilter, outreachSort]);
 
+  const eventsById = useMemo(
+    () => Object.fromEntries(qualifyingEvents.map((e) => [e.id, e])),
+    [qualifyingEvents]
+  );
+
   const churches = contacts.filter((c) => c.company_type === "church");
 
   const filteredContacts = useMemo(() => {
@@ -220,6 +225,7 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
         </div>
         <ContactsList
           contacts={filteredContacts}
+          eventsById={eventsById}
           emptyMessage="No properties surfaced yet — run the fetch-places edge function (needs GOOGLE_PLACES_API_KEY)."
         />
       </div>
@@ -230,7 +236,7 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
           Recommended sequencing: SupplyX delivers materials first, Interserv follows with a renovation
           proposal once the relationship is established.
         </p>
-        <ContactsList contacts={churches} emptyMessage="No churches surfaced yet." />
+        <ContactsList contacts={churches} eventsById={eventsById} emptyMessage="No churches surfaced yet." />
       </div>
     </div>
   );

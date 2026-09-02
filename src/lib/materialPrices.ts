@@ -57,6 +57,7 @@ export const MATERIAL_PRICE_REFERENCE: Record<string, MaterialPriceRef> = {
   "Countertops": { price: 55, unit: "per sq ft (laminate-to-quartz avg)" },
   "Fixtures": { price: 200, unit: "per fixture (avg)" },
   "Paint": { price: 45, unit: "per gallon" },
+  "Tarps": { price: 35, unit: "per 20x30ft heavy-duty poly tarp" },
 };
 
 export function getMaterialPrice(materialName: string): MaterialPriceRef | null {

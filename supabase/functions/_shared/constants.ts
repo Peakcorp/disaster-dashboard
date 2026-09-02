@@ -58,7 +58,7 @@ export const MATERIALS_BY_DISASTER_TYPE: Record<
       "Roofing shingles", "Roof tiles", "Hurricane straps", "Reinforcement tape/cable",
       "Impact windows", "Doors", "Siding", "Gutters", "Fascia", "Wood framing (structural)",
     ],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   flood: {
     destroyed: [
@@ -71,30 +71,30 @@ export const MATERIALS_BY_DISASTER_TYPE: Record<
     destroyed: [
       "Framing lumber", "Sheathing", "Roofing", "Windows", "Doors", "All interior finishes",
     ],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   winter_storm: {
     destroyed: [
       "Copper pipe", "PEX tubing", "Fittings", "Pipe insulation", "Drywall (burst-pipe damage)",
       "Water heaters", "Boilers", "Plumbing fixtures",
     ],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   earthquake: {
     destroyed: ["Structural reinforcement", "Drywall", "Tile", "Glazing/windows", "Foundation materials"],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   hail: {
     destroyed: ["Roofing shingles", "Metal roofing panels", "HVAC condenser coils", "Skylights", "Gutters"],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   tornado: {
     destroyed: ["Roofing", "Framing lumber", "Windows", "Doors", "Siding", "Structural reinforcement"],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   landslide: {
     destroyed: ["Foundation materials", "Structural reinforcement", "Drainage materials"],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
   extreme_heat: {
     destroyed: ["HVAC units", "Electrical panels"],
@@ -102,7 +102,7 @@ export const MATERIALS_BY_DISASTER_TYPE: Record<
   },
   man_made: {
     destroyed: ["Structural reinforcement", "Drywall", "Electrical panels", "HVAC units"],
-    consumed: ["Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
+    consumed: ["Tarps", "Cabinets", "Countertops", "Fixtures", "Flooring", "Paint"],
   },
 };
 
