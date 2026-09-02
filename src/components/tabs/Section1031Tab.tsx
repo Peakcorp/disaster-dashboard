@@ -3,16 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { DisasterEvent } from "@/types/event";
-import { CATEGORY_LABELS } from "@/types/event";
 import {
-  isFemaSourced,
-  femaDeclarationNumber,
-  femaDeclarationLink,
-  irsReliefSearchLink,
+  VERIFIED_1031_RELIEF,
+  matchedEventsForNotice,
   IRS_DISASTER_RELIEF_HUB,
 } from "@/lib/section1031";
 import { fetchAllPages } from "@/lib/supabaseFetch";
-import { formatRelativeTime } from "@/lib/format";
 
 export function Section1031Tab() {
   const [events, setEvents] = useState<DisasterEvent[]>([]);
@@ -21,39 +17,30 @@ export function Section1031Tab() {
   useEffect(() => {
     let isMounted = true;
     fetchAllPages<DisasterEvent>((from, to) =>
-      supabase.from("events").select("*").neq("status", "resolved").order("id", { ascending: true }).range(from, to)
-    ).then((live) => {
-      fetchAllPages<DisasterEvent>((from, to) =>
-        supabase
-          .from("events")
-          .select("*")
-          .eq("is_historical_seed", true)
-          .in("external_source", ["fema", "fema_declarations_2025"])
-          .order("start_date", { ascending: false })
-          .range(from, to)
-      ).then((historical) => {
-        if (!isMounted) return;
-        setEvents([...live, ...historical]);
-        setLoading(false);
-      });
+      supabase.from("events").select("*").order("id", { ascending: true }).range(from, to)
+    ).then((data) => {
+      if (!isMounted) return;
+      setEvents(data);
+      setLoading(false);
     });
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const femaEvents = useMemo(
+  const noticesWithMatches = useMemo(
     () =>
-      events
-        .filter(isFemaSourced)
-        .sort((a, b) => b.start_date.localeCompare(a.start_date)),
+      VERIFIED_1031_RELIEF.map((notice) => ({
+        notice,
+        matchedEvents: matchedEventsForNotice(events, notice),
+      })).sort((a, b) => b.notice.beganDate.localeCompare(a.notice.beganDate)),
     [events]
   );
 
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-foreground-muted">
-        Loading FEMA-declared disasters…
+        Loading verified IRS relief notices…
       </div>
     );
   }
@@ -61,18 +48,16 @@ export function Section1031Tab() {
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="glass-card rounded-lg p-4">
-        <p className="text-xs uppercase tracking-wide text-ai">1031 Exchange — Federal Disaster Relief</p>
+        <p className="text-xs uppercase tracking-wide text-ai">1031 Exchange — Verified IRS Relief Only</p>
         <p className="mt-2 text-sm text-foreground-muted">
-          Under IRC §7508A and Rev. Proc. 2018-58, the IRS automatically grants tax deadline relief to
-          taxpayers in any federally-declared (FEMA major disaster) area — this systematically includes
-          postponing 1031 like-kind exchange identification (45-day) and completion (180-day) deadlines. This
-          applies to essentially every FEMA declaration, not selectively (the 2018 Camp Fire, the 2025
-          Southern California wildfires, and numerous hurricane declarations have all triggered it). The{" "}
-          <span className="text-foreground">exact postponed date is set per declaration</span> and published by
-          the IRS as it happens — this tab identifies which of the disasters in this dashboard are FEMA-declared
-          (and therefore likely qualify) and links directly to where the current, authoritative date is
-          published. It is not legal or tax advice; verify with the IRS notice for the specific declaration
-          before relying on a deadline.
+          This list shows only disasters where an actual IRS news release was individually confirmed (read
+          directly from irs.gov, last checked 2026-09-02) to invoke Rev. Proc. 2018-58 relief — the provision
+          under which 1031 like-kind exchange identification/completion deadlines get postponed for taxpayers
+          in the disaster area, up to the same date as other postponed tax deadlines. Many other FEMA-declared
+          disasters in this dashboard likely qualify too under the same general federal rule, but are
+          intentionally left off this list until individually verified against a real IRS notice — this is not
+          legal or tax advice, and coverage (which counties, which taxpayers) is exactly as stated in each
+          linked notice, not broader.
         </p>
         <a
           href={IRS_DISASTER_RELIEF_HUB}
@@ -80,59 +65,48 @@ export function Section1031Tab() {
           rel="noopener noreferrer"
           className="mt-2 inline-block text-sm text-live hover:underline"
         >
-          IRS Disaster Tax Relief Hub (current announcements) →
+          IRS Disaster Tax Relief Hub (check for newer notices) →
         </a>
       </div>
 
-      {femaEvents.length === 0 ? (
-        <p className="text-sm text-foreground-muted">No FEMA-declared disasters tracked yet.</p>
-      ) : (
-        <ul className="flex flex-col gap-2">
-          {femaEvents.map((event) => {
-            const drNumber = femaDeclarationNumber(event);
-            return (
-              <li key={event.id} className="glass-card rounded-lg p-4 text-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-foreground">{event.name}</p>
-                    <p className="text-xs text-foreground-muted">
-                      {CATEGORY_LABELS[event.category]} · {event.states_affected.join(", ") || "—"}
-                      {drNumber && ` · FEMA DR-${drNumber}`}
-                    </p>
-                  </div>
-                  <span className="shrink-0 rounded border border-opportunity/40 bg-opportunity/15 px-2 py-0.5 text-[10px] font-medium uppercase text-opportunity">
-                    Likely Qualifies
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-foreground-muted">
-                  Declared {new Date(event.start_date).toISOString().slice(0, 10)} · Last updated{" "}
-                  {formatRelativeTime(event.last_fetched_at)}
+      <ul className="flex flex-col gap-2">
+        {noticesWithMatches.map(({ notice, matchedEvents }) => (
+          <li key={notice.id} className="glass-card rounded-lg p-4 text-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-foreground">
+                  {notice.state} — {notice.disasterDescription}
                 </p>
-                <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  {femaDeclarationLink(event) && (
-                    <a
-                      href={femaDeclarationLink(event)!}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-live hover:underline"
-                    >
-                      FEMA declaration page →
-                    </a>
-                  )}
-                  <a
-                    href={irsReliefSearchLink(event)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-live hover:underline"
-                  >
-                    Search for this declaration&apos;s IRS relief notice →
-                  </a>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                <p className="text-xs text-foreground-muted">
+                  Began {notice.beganDate} · IRS disaster code {notice.irsDisasterCode}
+                </p>
+              </div>
+              <span className="shrink-0 rounded border border-opportunity/40 bg-opportunity/15 px-2 py-0.5 text-[10px] font-medium uppercase text-opportunity">
+                Verified
+              </span>
+            </div>
+            <p className="mt-2 text-xs text-foreground-muted">
+              1031 exchange deadlines postponed to{" "}
+              <span className="text-foreground">{notice.postponedDeadline}</span> for taxpayers in the covered
+              area.
+            </p>
+            {matchedEvents.length > 0 && (
+              <p className="mt-1 text-xs text-foreground-muted">
+                Matches in this dashboard:{" "}
+                <span className="text-foreground">{matchedEvents.map((e) => e.name).join(", ")}</span>
+              </p>
+            )}
+            <a
+              href={notice.noticeUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-block text-xs text-live hover:underline"
+            >
+              Read the IRS notice →
+            </a>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
