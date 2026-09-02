@@ -62,9 +62,25 @@ function detectCategories(question: string): string[] {
   return Array.from(found);
 }
 
+// This is the first edge function in this project called directly from the
+// browser (supabase.functions.invoke in ChatTab.tsx) rather than by cron or
+// manual curl — needs CORS headers or the browser blocks the response, and
+// an OPTIONS preflight handler.
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: CORS_HEADERS });
+  }
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "POST only" }), { status: 405 });
+    return new Response(JSON.stringify({ error: "POST only" }), {
+      status: 405,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
   let question: string;
@@ -72,13 +88,22 @@ Deno.serve(async (req) => {
     const body = await req.json();
     question = String(body.question ?? "").trim();
   } catch {
-    return new Response(JSON.stringify({ error: "Invalid JSON body — expected { question: string }" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "Invalid JSON body — expected { question: string }" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
   if (!question) {
-    return new Response(JSON.stringify({ error: "question is required" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "question is required" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
   if (question.length > 500) {
-    return new Response(JSON.stringify({ error: "question too long (max 500 chars)" }), { status: 400 });
+    return new Response(JSON.stringify({ error: "question too long (max 500 chars)" }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -89,7 +114,7 @@ Deno.serve(async (req) => {
   if (tokensSpentToday >= DAILY_TOKEN_BUDGET) {
     return new Response(
       JSON.stringify({ answer: "Daily AI token budget reached for today — try again tomorrow.", data_used: false }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 
@@ -111,7 +136,10 @@ Deno.serve(async (req) => {
 
   const { data: matchedEvents, error: matchErr } = await query;
   if (matchErr) {
-    return new Response(JSON.stringify({ error: matchErr.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: matchErr.message }), {
+      status: 500,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    });
   }
 
   const { count: totalActiveCount } = await supabase
@@ -187,13 +215,13 @@ Deno.serve(async (req) => {
         data_used: (matchedEvents ?? []).length > 0,
         matched_event_count: (matchedEvents ?? []).length,
       }),
-      { headers: { "Content-Type": "application/json" } }
+      { headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   } catch (err) {
     console.error("chat-query failed", err);
     return new Response(
       JSON.stringify({ error: err instanceof Error ? err.message : String(err) }),
-      { status: 500 }
+      { status: 500, headers: { ...CORS_HEADERS, "Content-Type": "application/json" } }
     );
   }
 });
