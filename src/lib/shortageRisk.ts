@@ -41,10 +41,14 @@ export function computeShortageRiskMap(materials: EventMaterial[]): Map<string, 
   for (const [materialName, eventIds] of eventIdsByMaterial) {
     const concurrentDemandCount = eventIds.size;
     const historicallyShortageProne = HISTORICALLY_SHORTAGE_PRONE.has(materialName);
-    // Historically-prone items count double — real concurrent demand is
-    // still the primary signal, this just breaks ties toward items with an
-    // actual documented shortage history.
-    const riskScore = concurrentDemandCount * (historicallyShortageProne ? 2 : 1);
+    // Historically-prone items always rank above non-prone ones — a
+    // multiplicative weighting let generic items shared across nearly every
+    // disaster type (Cabinets, Flooring, Paint — in almost every category's
+    // "consumed" list) dominate purely on raw count, drowning out the
+    // actually-scarce, category-specific materials (lumber, roofing, impact
+    // windows) this signal exists to surface. Concurrent demand only breaks
+    // ties within each group.
+    const riskScore = (historicallyShortageProne ? 1_000_000 : 0) + concurrentDemandCount;
     result.set(materialName, { materialName, concurrentDemandCount, historicallyShortageProne, riskScore });
   }
   return result;
