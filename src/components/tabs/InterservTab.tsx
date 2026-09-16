@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import type { DisasterEvent, DisasterCategory } from "@/types/event";
 import { CATEGORY_LABELS } from "@/types/event";
@@ -45,6 +45,17 @@ const CONTACT_SORT_LABELS: Record<ContactSort, string> = {
 };
 
 export function InterservTab({ events }: { events: DisasterEvent[] }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const propertiesRef = useRef<HTMLDivElement>(null);
+
+  function scrollToProperties() {
+    propertiesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function scrollToTop() {
+    scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   const [contacts, setContacts] = useState<EventContact[]>([]);
   const [propertyType, setPropertyType] = useState<ContactCompanyType | "all">("all");
   const [statusFilter, setStatusFilter] = useState<ContactStatus | "all">("all");
@@ -129,12 +140,18 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
   }, [contacts, propertyType, statusFilter, contactSort]);
 
   return (
-    <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
+    <div ref={scrollRef} className="relative flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="glass-card rounded-lg p-4 lg:col-span-2">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs uppercase tracking-wide text-foreground-muted">Renovation Outreach Timing</p>
             <div className="flex gap-2">
+              <button
+                onClick={scrollToProperties}
+                className="glass-card rounded-md px-2 py-1 text-xs text-live transition hover:brightness-125"
+              >
+                ↓ Jump to Properties
+              </button>
               <select
                 value={categoryFilter}
                 onChange={(e) => setCategoryFilter(e.target.value as DisasterCategory | "all")}
@@ -182,7 +199,7 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
         </div>
       </div>
 
-      <div className="glass-card rounded-lg p-4">
+      <div ref={propertiesRef} className="glass-card rounded-lg p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs uppercase tracking-wide text-foreground-muted">
             Active Event Opportunities — surfaced properties
@@ -238,6 +255,14 @@ export function InterservTab({ events }: { events: DisasterEvent[] }) {
         </p>
         <ContactsList contacts={churches} eventsById={eventsById} emptyMessage="No churches surfaced yet." />
       </div>
+
+      <button
+        onClick={scrollToTop}
+        title="Back to top"
+        className="glass-card fixed bottom-6 right-6 z-40 rounded-full px-3 py-2 text-sm text-live shadow-lg transition hover:brightness-125"
+      >
+        ↑ Top
+      </button>
     </div>
   );
 }

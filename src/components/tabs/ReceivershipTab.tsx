@@ -6,7 +6,7 @@ import type { PropertyReceivership, ReceivershipStatus } from "@/types/company";
 import { formatRelativeTime } from "@/lib/format";
 
 const STATUS_LABELS: Record<ReceivershipStatus, string> = {
-  reported: "Reported (unverified)",
+  reported: "Reported (auto-found, unverified)",
   confirmed: "Confirmed",
   resolved: "Resolved",
 };
@@ -17,14 +17,11 @@ const STATUS_STYLES: Record<ReceivershipStatus, string> = {
   resolved: "bg-white/5 text-foreground-muted border-white/10",
 };
 
-const EMPTY_FORM = { property_name: "", address: "", state: "", news_url: "", notes: "" };
-
 export function ReceivershipTab() {
   const [entries, setEntries] = useState<PropertyReceivership[]>([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [checkedCount, setCheckedCount] = useState<number | null>(null);
+  const [totalCandidates, setTotalCandidates] = useState<number | null>(null);
 
   function load() {
     supabase
@@ -36,31 +33,22 @@ export function ReceivershipTab() {
         setEntries((data as PropertyReceivership[]) ?? []);
         setLoading(false);
       });
+
+    supabase
+      .from("event_contacts")
+      .select("id", { count: "exact", head: true })
+      .in("company_type", ["hotel", "office", "mixed_use", "apartment"])
+      .then(({ count }) => setTotalCandidates(count ?? 0));
+
+    supabase
+      .from("event_contacts")
+      .select("id", { count: "exact", head: true })
+      .in("company_type", ["hotel", "office", "mixed_use", "apartment"])
+      .not("receivership_checked_at", "is", null)
+      .then(({ count }) => setCheckedCount(count ?? 0));
   }
 
   useEffect(load, []);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.property_name.trim()) return;
-    setSubmitting(true);
-    setError(null);
-    const { error } = await supabase.from("property_receiverships").insert({
-      property_name: form.property_name.trim(),
-      address: form.address.trim() || null,
-      state: form.state.trim().toUpperCase() || null,
-      news_url: form.news_url.trim() || null,
-      notes: form.notes.trim() || null,
-      receivership_status: "reported",
-    });
-    setSubmitting(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    setForm(EMPTY_FORM);
-    load();
-  }
 
   async function updateStatus(id: string, status: ReceivershipStatus) {
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, receivership_status: status } : e)));
@@ -74,66 +62,29 @@ export function ReceivershipTab() {
   return (
     <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">
       <div className="glass-card rounded-lg p-4">
-        <p className="text-xs uppercase tracking-wide text-ai">Receivership Tracker</p>
+        <p className="text-xs uppercase tracking-wide text-ai">Receivership Tracker — Auto-Searched</p>
         <p className="mt-2 text-sm text-foreground-muted">
-          There is no free API or reliable automated way to detect whether a specific commercial property has
-          gone into receivership — court filings and receivership news are sparse and property-specific (a
-          general search for disaster-linked receivership cases turned up nothing usable). This list is
-          populated manually as the team finds real cases, same as the Referral Partner Database — add an entry
-          below with a source link when you learn of one.
+          This list is populated automatically: a daily job searches the web for receivership, foreclosure, and
+          financial-distress news about the commercial properties (hotels, offices, apartments, mixed-use)
+          Interserv has surfaced, and only records a property here when something real actually turns up. Most
+          properties will find nothing — that&apos;s expected, not a gap, since receivership is genuinely rare.
+          Status is &quot;Reported (auto-found, unverified)&quot; until someone confirms it against the source.
         </p>
+        {totalCandidates != null && checkedCount != null && (
+          <p className="mt-2 text-xs text-foreground-muted">
+            {checkedCount.toLocaleString()} of {totalCandidates.toLocaleString()} candidate properties checked so
+            far ({(totalCandidates - checkedCount).toLocaleString()} remaining in the queue).
+          </p>
+        )}
       </div>
-
-      <form onSubmit={submit} className="glass-card flex flex-col gap-2 rounded-lg p-4">
-        <p className="text-xs uppercase tracking-wide text-foreground-muted">Add a reported case</p>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <input
-            required
-            placeholder="Property name *"
-            value={form.property_name}
-            onChange={(e) => setForm((f) => ({ ...f, property_name: e.target.value }))}
-            className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
-          />
-          <input
-            placeholder="State (e.g. FL)"
-            value={form.state}
-            onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
-            className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted"
-          />
-          <input
-            placeholder="Address"
-            value={form.address}
-            onChange={(e) => setForm((f) => ({ ...f, address: e.target.value }))}
-            className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted sm:col-span-2"
-          />
-          <input
-            placeholder="News/source URL"
-            value={form.news_url}
-            onChange={(e) => setForm((f) => ({ ...f, news_url: e.target.value }))}
-            className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted sm:col-span-2"
-          />
-          <textarea
-            placeholder="Notes"
-            value={form.notes}
-            onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-            className="glass-card rounded-md px-2 py-1.5 text-sm text-foreground placeholder:text-foreground-muted sm:col-span-2"
-            rows={2}
-          />
-        </div>
-        {error && <p className="text-xs text-critical">Failed to add entry: {error}</p>}
-        <button
-          type="submit"
-          disabled={submitting || !form.property_name.trim()}
-          className="glass-card self-start rounded-md px-3 py-1.5 text-sm text-live transition hover:brightness-125 disabled:opacity-50"
-        >
-          {submitting ? "Adding…" : "Add entry"}
-        </button>
-      </form>
 
       {loading ? (
         <p className="text-sm text-foreground-muted">Loading…</p>
       ) : entries.length === 0 ? (
-        <p className="text-sm text-foreground-muted">No receivership cases logged yet.</p>
+        <p className="text-sm text-foreground-muted">
+          No receivership cases found yet — either the search hasn&apos;t worked through the queue yet, or
+          nothing has turned up so far.
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {entries.map((entry) => (
@@ -151,7 +102,7 @@ export function ReceivershipTab() {
                   className={`shrink-0 rounded border px-1.5 py-0.5 text-[10px] uppercase ${STATUS_STYLES[entry.receivership_status]}`}
                 >
                   {(Object.keys(STATUS_LABELS) as ReceivershipStatus[]).map((s) => (
-                    <option key={s} value={s} className="bg-background text-foreground normal-case">
+                    <option key={s} value={s}>
                       {STATUS_LABELS[s]}
                     </option>
                   ))}
@@ -164,7 +115,7 @@ export function ReceivershipTab() {
                     Source →
                   </a>
                 )}
-                <span className="text-foreground-muted">Added {formatRelativeTime(entry.created_at)}</span>
+                <span className="text-foreground-muted">Found {formatRelativeTime(entry.created_at)}</span>
               </div>
             </li>
           ))}

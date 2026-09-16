@@ -49,6 +49,22 @@ body {
   -webkit-backdrop-filter: blur(12px);
 }
 
+/* Native <select>/<option> popups ignore the app's own CSS classes (they're
+   rendered by the OS/browser, not the page) — `color-scheme: dark` on <html>
+   alone wasn't enough in every browser to stop them rendering white-on-white
+   against this dark theme. Forcing it explicitly here fixes every dropdown
+   in the app from one place instead of patching each one individually. */
+select {
+  color-scheme: dark;
+  background-color: var(--surface);
+  color: var(--foreground);
+}
+
+select option {
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
 .leaflet-container {
   background: #0a0f1e;
   width: 100%;

@@ -11,8 +11,10 @@ interface ChatMessage {
 const SUGGESTIONS = [
   "How many active wildfires are there right now?",
   "What's happening in Florida?",
-  "Which categories have the most active events?",
   "What materials are most likely to be in shortage right now?",
+  "Are any properties in receivership?",
+  "Which disasters have a verified 1031 exchange extension?",
+  "What are the price gouging rules I should know about?",
 ];
 
 export function ChatTab() {
