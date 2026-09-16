@@ -59,9 +59,14 @@ export function DisasterMap({
       className="h-full w-full"
       preferCanvas
     >
+      {/* CARTO's free anonymous basemap tiles now require an account/API key
+          (unauthenticated requests return an "API KEY REQUIRED" watermark) —
+          switched to Esri's World Dark Gray Base, which is still free and
+          keyless. Note the {z}/{y}/{x} order: that's ArcGIS's REST tile path
+          convention, not standard XYZ's {z}/{x}/{y}. */}
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution='&copy; <a href="https://www.esri.com">Esri</a> — Esri, HERE, Garmin, FAO, NOAA, USGS'
         noWrap
       />
       {plottable.map((event) => (
